@@ -256,7 +256,6 @@
 <header>
   <div class="eyebrow">การรถไฟแห่งประเทศไทย · สายใต้</div>
   <h1>รายงานการแจ้งเวลาขบวนรถไฟ</h1>
-  <div class="sub">ปดร.ที่ 92/11/2566 · ใช้ตั้งแต่ 15 ธ.ค. 2566</div>
 </header>
 
 <main>
@@ -297,7 +296,7 @@
     </div>
 
     <div class="event-block" id="depBlock">
-      <div class="event-title">🚂 เวลารถออก (ออกจากสถานี)</div>
+      <div class="event-title" id="depEventTitle">🚂 เวลารถออก (ออกจากสถานี)</div>
       <div class="divider-label" id="depSchedLabel">เวลาตามตาราง —</div>
       <div class="field-row">
         <div>
@@ -305,7 +304,7 @@
           <input type="text" id="depSched" placeholder="ชม.นาที เช่น 8.58">
         </div>
         <div>
-          <label for="depActual">เวลาจริงที่ออก</label>
+          <label for="depActual" id="depActualLabel">เวลาจริงที่ออก</label>
           <input type="time" id="depActual">
         </div>
       </div>
@@ -354,7 +353,7 @@
     </div>
 
     <div class="event-block" id="meetDepBlock">
-      <div class="event-title">🚂 เวลารถออก (ออกจากสถานี)</div>
+      <div class="event-title" id="meetDepEventTitle">🚂 เวลารถออก (ออกจากสถานี)</div>
       <div class="divider-label" id="meetDepSchedLabel">เวลาตามตาราง —</div>
       <div class="field-row">
         <div>
@@ -362,7 +361,7 @@
           <input type="text" id="meetDepSched" placeholder="ชม.นาที เช่น 8.58">
         </div>
         <div>
-          <label for="meetDepActual">เวลาจริงที่ออก</label>
+          <label for="meetDepActual" id="meetDepActualLabel">เวลาจริงที่ออก</label>
           <input type="time" id="meetDepActual">
         </div>
       </div>
@@ -400,7 +399,7 @@ const SCHEDULE_DATA = {
     "ท่าแมงลัก(งก.)",
     "เกาะสะบ้า(กส.)",
     "เทพา(ทพ.)",
-    "ดาแปด(ดป.)",
+    "ตาแปด(ตป.)",
     "บ้านนิคม(นิ.*)",
     "ปัตตานี(นี.)",
     "นาประดู่(ดต.)",
@@ -458,7 +457,7 @@ const SCHEDULE_DATA = {
       "arr": "7.23",
       "dep": "7.24"
      },
-     "ดาแปด(ดป.)": {
+     "ตาแปด(ตป.)": {
       "arr": "-",
       "dep": "7.31"
      },
@@ -596,7 +595,7 @@ const SCHEDULE_DATA = {
       "arr": "-",
       "dep": "8.03"
      },
-     "ดาแปด(ดป.)": {
+     "ตาแปด(ตป.)": {
       "arr": "-",
       "dep": "8.09"
      },
@@ -734,9 +733,9 @@ const SCHEDULE_DATA = {
       "arr": "8.37",
       "dep": "8.40"
      },
-     "ดาแปด(ดป.)": {
-      "arr": "8.37",
-      "dep": "8.40"
+     "ตาแปด(ตป.)": {
+      "arr": "-",
+      "dep": "9.35"
      },
      "บ้านนิคม(นิ.*)": {
       "arr": "-",
@@ -872,9 +871,9 @@ const SCHEDULE_DATA = {
       "arr": "9.01",
       "dep": "9.02"
      },
-     "ดาแปด(ดป.)": {
-      "arr": "9.09",
-      "dep": "9.16"
+     "ตาแปด(ตป.)": {
+      "arr": "9.10",
+      "dep": "9.19"
      },
      "บ้านนิคม(นิ.*)": {
       "arr": "9.20",
@@ -1010,9 +1009,9 @@ const SCHEDULE_DATA = {
       "arr": "9.51",
       "dep": "9.52"
      },
-     "ดาแปด(ดป.)": {
+     "ตาแปด(ตป.)": {
       "arr": "-",
-      "dep": "9.59"
+      "dep": "10.28"
      },
      "บ้านนิคม(นิ.*)": {
       "arr": "-",
@@ -1083,7 +1082,7 @@ const SCHEDULE_DATA = {
       "dep": "-"
      },
      "ตันหยงมัส(ยม.)": {
-      "arr": "-",
+      "arr": "11.20",
       "dep": "-"
      },
      "ป่าไผ่(ปผ.)": {
@@ -1148,7 +1147,7 @@ const SCHEDULE_DATA = {
       "arr": "11.16",
       "dep": "11.17"
      },
-     "ดาแปด(ดป.)": {
+     "ตาแปด(ตป.)": {
       "arr": "11.25",
       "dep": "11.26"
      },
@@ -1286,9 +1285,9 @@ const SCHEDULE_DATA = {
       "arr": "13.48",
       "dep": "14.49"
      },
-     "ดาแปด(ดป.)": {
-      "arr": "13.57",
-      "dep": "14.04"
+     "ตาแปด(ตป.)": {
+      "arr": "14.00",
+      "dep": "14.01"
      },
      "บ้านนิคม(นิ.*)": {
       "arr": "14.08",
@@ -1424,7 +1423,7 @@ const SCHEDULE_DATA = {
       "arr": "15.40",
       "dep": "15.44"
      },
-     "ดาแปด(ดป.)": {
+     "ตาแปด(ตป.)": {
       "arr": "15.52",
       "dep": "15.53"
      },
@@ -1562,7 +1561,7 @@ const SCHEDULE_DATA = {
       "arr": "-",
       "dep": "-"
      },
-     "ดาแปด(ดป.)": {
+     "ตาแปด(ตป.)": {
       "arr": "-",
       "dep": "-"
      },
@@ -1701,7 +1700,7 @@ const SCHEDULE_DATA = {
     "นาประดู่(ดต.)",
     "ปัตตานี(นี.)",
     "บ้านนิคม(นิ.*)",
-    "ดาแปด(ดป.)",
+    "ตาแปด(ตป.)",
     "เทพา(ทพ.)",
     "เกาะสะบ้า(กส.)",
     "ท่าแมงลัก(งก.)",
@@ -1745,8 +1744,8 @@ const SCHEDULE_DATA = {
       "dep": "7.11"
      },
      "ตันหยงมัส(ยม.)": {
-      "arr": "-",
-      "dep": "-"
+      "arr": "7.16",
+      "dep": "7.17"
      },
      "กะแด๊ะ(กแ.*)": {
       "arr": "7.22",
@@ -1816,7 +1815,7 @@ const SCHEDULE_DATA = {
       "arr": "7.23",
       "dep": "7.24"
      },
-     "ดาแปด(ดป.)": {
+     "ตาแปด(ตป.)": {
       "arr": "7.29",
       "dep": "7.33"
      },
@@ -1954,9 +1953,9 @@ const SCHEDULE_DATA = {
       "arr": "-",
       "dep": "9.10"
      },
-     "ดาแปด(ดป.)": {
-      "arr": "9.14",
-      "dep": "9.15"
+     "ตาแปด(ตป.)": {
+      "arr": "9.17",
+      "dep": "9.18"
      },
      "เทพา(ทพ.)": {
       "arr": "9.24",
@@ -2092,7 +2091,7 @@ const SCHEDULE_DATA = {
       "arr": "-",
       "dep": "11.49"
      },
-     "ดาแปด(ดป.)": {
+     "ตาแปด(ตป.)": {
       "arr": "11.53",
       "dep": "11.54"
      },
@@ -2230,7 +2229,7 @@ const SCHEDULE_DATA = {
       "arr": "-",
       "dep": "-"
      },
-     "ดาแปด(ดป.)": {
+     "ตาแปด(ตป.)": {
       "arr": "-",
       "dep": "-"
      },
@@ -2368,9 +2367,9 @@ const SCHEDULE_DATA = {
       "arr": "14.51",
       "dep": "14.52"
      },
-     "ดาแปด(ดป.)": {
-      "arr": "14.55",
-      "dep": "14.56"
+     "ตาแปด(ตป.)": {
+      "arr": "15.32",
+      "dep": "15.33"
      },
      "เทพา(ทพ.)": {
       "arr": "15.03",
@@ -2435,8 +2434,8 @@ const SCHEDULE_DATA = {
       "dep": "-"
      },
      "ตันหยงมัส(ยม.)": {
-      "arr": "-",
-      "dep": "-"
+      "arr": "14.21",
+      "dep": "14.24"
      },
      "กะแด๊ะ(กแ.*)": {
       "arr": "-",
@@ -2506,9 +2505,9 @@ const SCHEDULE_DATA = {
       "arr": "-",
       "dep": "-"
      },
-     "ดาแปด(ดป.)": {
+     "ตาแปด(ตป.)": {
       "arr": "-",
-      "dep": "14.02"
+      "dep": "17.07"
      },
      "เทพา(ทพ.)": {
       "arr": "-",
@@ -2644,9 +2643,9 @@ const SCHEDULE_DATA = {
       "arr": "-",
       "dep": "-"
      },
-     "ดาแปด(ดป.)": {
+     "ตาแปด(ตป.)": {
       "arr": "-",
-      "dep": "-"
+      "dep": "14.42"
      },
      "เทพา(ทพ.)": {
       "arr": "15.42",
@@ -2782,9 +2781,9 @@ const SCHEDULE_DATA = {
       "arr": "-",
       "dep": "15.35"
      },
-     "ดาแปด(ดป.)": {
+     "ตาแปด(ตป.)": {
       "arr": "-",
-      "dep": "-"
+      "dep": "17.18"
      },
      "เทพา(ทพ.)": {
       "arr": "-",
@@ -2920,9 +2919,9 @@ const SCHEDULE_DATA = {
       "arr": "-",
       "dep": "16.58"
      },
-     "ดาแปด(ดป.)": {
+     "ตาแปด(ตป.)": {
       "arr": "-",
-      "dep": "14.35"
+      "dep": "16.35"
      },
      "เทพา(ทพ.)": {
       "arr": "17.04",
@@ -3250,6 +3249,11 @@ function updateBadgeAndSchedule(){
   document.getElementById('arrSchedLabel').textContent = 'เวลาตามตาราง: ' + (sched.arr==='-'?'ไม่มีกำหนด (ต้นทาง/ไม่จอด)':sched.arr+' น.');
   document.getElementById('depSchedLabel').textContent = 'เวลาตามตาราง: ' + (sched.dep==='-'?'ไม่มีกำหนด (ปลายทาง/ไม่จอด)':sched.dep+' น.');
 
+  // if the station only has a departure time in the schedule (no arrival), the train is passing through, not stopping
+  const isPassOnly = (sched.arr === '-' && sched.dep !== '-');
+  document.getElementById('depEventTitle').textContent = isPassOnly ? '🚋 เวลารถผ่าน (ผ่านสถานี)' : '🚂 เวลารถออก (ออกจากสถานี)';
+  document.getElementById('depActualLabel').textContent = isPassOnly ? 'เวลาจริงที่ผ่าน' : 'เวลาจริงที่ออก';
+
   populateMeetTrains();
   calcAll();
 }
@@ -3304,6 +3308,11 @@ function updateMeetSchedule(){
   document.getElementById('meetDepSched').value = sched.dep;
   document.getElementById('meetArrSchedLabel').textContent = 'เวลาตามตาราง: ' + (sched.arr==='-'?'ไม่มีกำหนด (ต้นทาง/ไม่จอด)':sched.arr+' น.');
   document.getElementById('meetDepSchedLabel').textContent = 'เวลาตามตาราง: ' + (sched.dep==='-'?'ไม่มีกำหนด (ปลายทาง/ไม่จอด)':sched.dep+' น.');
+
+  const meetIsPassOnly = (sched.arr === '-' && sched.dep !== '-');
+  document.getElementById('meetDepEventTitle').textContent = meetIsPassOnly ? '🚋 เวลารถผ่าน (ผ่านสถานี)' : '🚂 เวลารถออก (ออกจากสถานี)';
+  document.getElementById('meetDepActualLabel').textContent = meetIsPassOnly ? 'เวลาจริงที่ผ่าน' : 'เวลาจริงที่ออก';
+
   calcAll();
 }
 
@@ -3459,17 +3468,21 @@ function buildSummary(arrRes, depRes, meetArrRes, meetDepRes){
   let lines = [];
   lines.push(stationShort);
   lines.push('ขบวน ' + train);
+  const primarySched = currentSchedule() || {arr:'-', dep:'-'};
+  const primaryPassOnly = (primarySched.arr === '-' && primarySched.dep !== '-');
   if(arrActual){
     const d = shortDelay(arrRes);
     lines.push('ถึง ' + niceTime(arrActual) + ' น.' + (d ? '  — ' + d : ''));
   }
   if(depActual){
     const d = shortDelay(depRes);
-    lines.push('ออก ' + niceTime(depActual) + ' น.' + (d ? '  — ' + d : ''));
+    lines.push((primaryPassOnly ? 'ผ่าน ' : 'ออก ') + niceTime(depActual) + ' น.' + (d ? '  — ' + d : ''));
   }
 
   if(meetOn && meetTrainSelect.value && (meetArrActual || meetDepActual)){
     const meetTrain = meetTrainSelect.value;
+    const meetSched = meetSchedule() || {arr:'-', dep:'-'};
+    const meetPassOnly = (meetSched.arr === '-' && meetSched.dep !== '-');
     lines.push('ขบวนหลีก ' + meetTrain);
     if(meetArrActual){
       const d = shortDelay(meetArrRes);
@@ -3477,7 +3490,7 @@ function buildSummary(arrRes, depRes, meetArrRes, meetDepRes){
     }
     if(meetDepActual){
       const d = shortDelay(meetDepRes);
-      lines.push('ออก ' + niceTime(meetDepActual) + ' น.' + (d ? '  — ' + d : ''));
+      lines.push((meetPassOnly ? 'ผ่าน ' : 'ออก ') + niceTime(meetDepActual) + ' น.' + (d ? '  — ' + d : ''));
     }
   }
 
