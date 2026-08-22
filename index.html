@@ -608,20 +608,6 @@
   <div class="card" id="timesCard" style="display:none;">
     <h2><span class="num">3</span>บันทึกเวลาจริง</h2>
 
-    <label class="check-row" for="reminderToggle" style="display:flex;align-items:center;gap:10px;margin-bottom:6px;cursor:pointer;">
-      <input type="checkbox" id="reminderToggle" style="width:20px;height:20px;margin:0;flex-shrink:0;">
-      <span style="font-size:13px;font-weight:600;color:var(--ink);">🔔 แจ้งเตือนเมื่อใกล้ถึงเวลาตามตาราง</span>
-    </label>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-      <label for="reminderLead" style="margin:0;font-weight:500;font-size:12.5px;color:#8a7c68;">เตือนล่วงหน้า</label>
-      <select id="reminderLead" style="width:auto;margin-bottom:0;padding:6px 10px;font-size:13px;">
-        <option value="0">ตรงเวลา</option>
-        <option value="3" selected>3 นาที</option>
-        <option value="5">5 นาที</option>
-        <option value="10">10 นาที</option>
-      </select>
-    </div>
-
     <div class="event-block" id="arrBlock">
       <div class="event-title">🚉 เวลารถถึง (ถึงสถานี)</div>
       <div class="divider-label" id="arrSchedLabel">เวลาตามตาราง —</div>
@@ -1834,7 +1820,6 @@ function updateBadgeAndSchedule(){
     meetCard.style.display='none';
     summaryCard.style.display='none';
     emptyHint.style.display='block';
-    clearReminders();
     return;
   }
   timesCard.style.display='block';
@@ -1853,7 +1838,6 @@ function updateBadgeAndSchedule(){
 
   populateMeetTrains();
   calcAll();
-  setupReminders(sched);
 }
 
 function populateMeetTrains(){
@@ -2451,70 +2435,6 @@ exportCsvBtn.addEventListener('click', async ()=>{
   }
   exportCsvBtn.disabled = false;
 });
-
-// ---------- Reminders (browser Notification API, best-effort) ----------
-// Notifies a few minutes before the scheduled arrival/departure of the
-// currently selected train at the currently selected station. Only works
-// while this page/tab stays open, and only if the browser grants permission.
-const reminderToggle = document.getElementById('reminderToggle');
-const reminderLeadSelect = document.getElementById('reminderLead');
-let reminderTimers = [];
-
-function clearReminders(){
-  reminderTimers.forEach(t=>clearTimeout(t));
-  reminderTimers = [];
-}
-
-function scheduleOneReminder(label, hhmm){
-  const mins = schedToMinutes(hhmm);
-  if(mins === null) return;
-  const leadMin = parseInt(reminderLeadSelect.value, 10) || 0;
-  const now = new Date();
-  const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), Math.floor(mins/60), mins%60, 0);
-  target.setMinutes(target.getMinutes() - leadMin);
-  if(target <= now) target.setDate(target.getDate()+1); // schedule for tomorrow if already passed today
-  const msUntil = target - now;
-  if(msUntil > 24*60*60*1000) return; // don't bother scheduling more than a day out
-  const timer = setTimeout(()=>{
-    const train = trainSelect.value;
-    const station = stationSelect.value.replace(/\([^)]*\)\s*$/,'').trim();
-    const body = 'ขบวน ' + train + ' ที่ ' + station + ' — ' + label + ' ตามตาราง ' + hhmm + ' น.';
-    if(window.Notification && Notification.permission === 'granted'){
-      try{ new Notification('ใกล้ถึงเวลา', {body}); }catch(e){ showToast(body); }
-    } else {
-      showToast(body);
-    }
-  }, msUntil);
-  reminderTimers.push(timer);
-}
-
-function setupReminders(sched){
-  clearReminders();
-  if(!reminderToggle || !reminderToggle.checked) return;
-  if(sched.arr !== '-') scheduleOneReminder('ถึงสถานี', sched.arr);
-  if(sched.dep !== '-') scheduleOneReminder('ออก/ผ่านสถานี', sched.dep);
-}
-
-if(reminderToggle){
-  reminderToggle.addEventListener('change', async ()=>{
-    if(reminderToggle.checked){
-      if(window.Notification && Notification.permission === 'default'){
-        try{ await Notification.requestPermission(); }catch(e){}
-      }
-      const sched = currentSchedule();
-      if(sched) setupReminders(sched);
-      showToast('ตั้งเตือนแล้ว (ใช้ได้ขณะเปิดหน้านี้ไว้)');
-    } else {
-      clearReminders();
-    }
-  });
-}
-if(reminderLeadSelect){
-  reminderLeadSelect.addEventListener('change', ()=>{
-    const sched = currentSchedule();
-    if(sched) setupReminders(sched);
-  });
-}
 
 // ---------- Custom train editor ----------
 const addTrainBtn = document.getElementById('addTrainBtn');
