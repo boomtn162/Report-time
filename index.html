@@ -1928,6 +1928,7 @@ async function syncFromGoogleSheet(){
   sheetSyncBarSet('🔄 กำลังซิงก์ตารางเวลาจาก Google Sheet…', '');
 
   let okCount = 0, failCount = 0, rowCount = 0, rateLimited = 0;
+  const failedStations = [];
   await runWithConcurrency(stationOrder, 5, async (station)=>{
     const tab = sheetTabName(station);
     const url = 'https://docs.google.com/spreadsheets/d/' + GOOGLE_SHEET_ID +
@@ -1965,7 +1966,9 @@ async function syncFromGoogleSheet(){
       okCount++;
     }catch(e){
       failCount++;
+      failedStations.push(station);
       if(String(e.message||'').includes('429')) rateLimited++;
+      console.warn('[sheet sync] failed for station "' + station + '" (tab "' + tab + '"):', e.message || e);
     }
   });
 
@@ -1976,7 +1979,8 @@ async function syncFromGoogleSheet(){
     setTimeout(()=>{ const bar = document.getElementById('sheetSyncBar'); if(bar) bar.hidden = true; }, 4000);
   } else if(okCount > 0){
     const reason = rateLimited === failCount ? 'Google จำกัดจำนวนคำขอชั่วคราว' : 'บางสถานีดึงไม่สำเร็จ';
-    sheetSyncBarSet('⚠️ ซิงก์ได้บางส่วน (' + okCount + '/' + (okCount+failCount) + ' สถานี, ' + reason + ') ใช้ข้อมูลออฟไลน์แทนสำหรับส่วนที่เหลือ', 'is-error');
+    const shown = failedStations.slice(0, 3).join(', ') + (failedStations.length > 3 ? ' และอีก ' + (failedStations.length - 3) + ' สถานี' : '');
+    sheetSyncBarSet('⚠️ ซิงก์ได้บางส่วน (' + okCount + '/' + (okCount+failCount) + ' สถานี, ' + reason + '): ' + shown + ' — ใช้ข้อมูลออฟไลน์แทนสำหรับส่วนที่เหลือ', 'is-error');
   } else {
     sheetSyncBarSet('⚠️ ดึงข้อมูลจาก Google Sheet ไม่ได้ (อาจยังไม่ได้เปิดแชร์แบบสาธารณะ หรือ Google จำกัดคำขอชั่วคราว) กำลังใช้ตารางเวลาสำรองในเครื่อง', 'is-error');
   }
