@@ -1887,20 +1887,23 @@ function sleep(ms){ return new Promise(res => setTimeout(res, ms)); }
 
 // Google's gviz endpoint rate-limits bursts of requests from the same
 // client (HTTP 429) — firing all ~37 station tabs at once reliably trips
-// it. Run only a few at a time, and retry a 429/5xx with backoff.
-async function fetchCsvWithRetry(url, attempts = 4){
+// it. Run only a few at a time. Each request gets one quick retry here;
+// the real "wait for the rate limit to cool down" retrying happens as
+// sweep passes over the whole sync (see syncFromGoogleSheet) so a bad
+// outage can't balloon into minutes of per-request backoff.
+async function fetchCsvWithRetry(url, attempts = 2){
   for(let i = 0; i < attempts; i++){
     let res;
     try{
       res = await fetch(url, { cache: 'no-store' });
     }catch(e){
       if(i === attempts - 1) throw e;
-      await sleep(400 * (i + 1) + Math.random() * 300);
+      await sleep(300 + Math.random() * 200);
       continue;
     }
     if(res.ok) return await res.text();
     if((res.status === 429 || res.status >= 500) && i < attempts - 1){
-      await sleep(500 * (i + 1) + Math.random() * 400); // backoff + jitter
+      await sleep(400 + Math.random() * 300);
       continue;
     }
     throw new Error('HTTP ' + res.status);
@@ -1921,66 +1924,97 @@ async function runWithConcurrency(items, limit, worker){
   await Promise.all(runners);
 }
 
+// Fetch one station's tab and, on success, merge its rows into ALL_TRAINS.
+// Throws on failure so the caller can decide whether/when to retry it.
+async function syncOneStation(station){
+  const tab = sheetTabName(station);
+  const url = 'https://docs.google.com/spreadsheets/d/' + GOOGLE_SHEET_ID +
+    '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(tab);
+  const csv = await fetchCsvWithRetry(url);
+  const rows = parseCsv(csv);
+  let rowsMerged = 0;
+  if(rows.length < 2) return rowsMerged; // empty tab (header only, or truly empty) is fine
+  const header = rows[0].map(h => h.trim());
+  const iTrain = header.indexOf('ขบวน');
+  const iMeta = header.indexOf('ประเภท');
+  const iRoute = header.indexOf('สาย');
+  const iArr = header.indexOf('เวลาถึง');
+  const iDep = header.indexOf('เวลาออก');
+  if(iTrain === -1 || iArr === -1 || iDep === -1) throw new Error('unexpected header');
+  for(let r = 1; r < rows.length; r++){
+    const cells = rows[r];
+    const trainNo = (cells[iTrain] || '').trim();
+    if(!trainNo) continue;
+    const arr = (cells[iArr] || '-').trim() || '-';
+    const dep = (cells[iDep] || '-').trim() || '-';
+    if(!ALL_TRAINS[trainNo]){
+      ALL_TRAINS[trainNo] = {
+        schedule: {},
+        meta: (iMeta > -1 && cells[iMeta] || '').trim(),
+        routeName: (iRoute > -1 && cells[iRoute] || '').trim() || 'จาก Google Sheet',
+        custom: false
+      };
+    } else if(iMeta > -1 && cells[iMeta] && cells[iMeta].trim()){
+      ALL_TRAINS[trainNo].meta = cells[iMeta].trim();
+    }
+    ALL_TRAINS[trainNo].schedule[station] = { arr, dep };
+    rowsMerged++;
+  }
+  return rowsMerged;
+}
+
 let sheetSyncInFlight = false;
 async function syncFromGoogleSheet(){
   if(!GOOGLE_SHEET_ID || sheetSyncInFlight) return;
   sheetSyncInFlight = true;
   sheetSyncBarSet('🔄 กำลังซิงก์ตารางเวลาจาก Google Sheet…', '');
 
-  let okCount = 0, failCount = 0, rowCount = 0, rateLimited = 0;
-  const failedStations = [];
-  await runWithConcurrency(stationOrder, 5, async (station)=>{
-    const tab = sheetTabName(station);
-    const url = 'https://docs.google.com/spreadsheets/d/' + GOOGLE_SHEET_ID +
-      '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(tab);
+  let rowCount = 0;
+  const pending = stationOrder.slice();
+  const startedAt = Date.now();
+  const SYNC_DEADLINE_MS = 20000; // hard cap so a real outage can't hang the spinner for minutes
+
+  // First pass: modest concurrency so we don't trip Google's rate limit in
+  // the first place. Each request already retries once on its own
+  // (fetchCsvWithRetry).
+  let stillFailing = [];
+  await runWithConcurrency(pending, 4, async (station)=>{
     try{
-      const csv = await fetchCsvWithRetry(url);
-      const rows = parseCsv(csv);
-      if(rows.length < 2) { okCount++; return; } // empty tab (header only, or truly empty) is fine
-      const header = rows[0].map(h => h.trim());
-      const iTrain = header.indexOf('ขบวน');
-      const iMeta = header.indexOf('ประเภท');
-      const iRoute = header.indexOf('สาย');
-      const iArr = header.indexOf('เวลาถึง');
-      const iDep = header.indexOf('เวลาออก');
-      if(iTrain === -1 || iArr === -1 || iDep === -1) throw new Error('unexpected header');
-      for(let r = 1; r < rows.length; r++){
-        const cells = rows[r];
-        const trainNo = (cells[iTrain] || '').trim();
-        if(!trainNo) continue;
-        const arr = (cells[iArr] || '-').trim() || '-';
-        const dep = (cells[iDep] || '-').trim() || '-';
-        if(!ALL_TRAINS[trainNo]){
-          ALL_TRAINS[trainNo] = {
-            schedule: {},
-            meta: (iMeta > -1 && cells[iMeta] || '').trim(),
-            routeName: (iRoute > -1 && cells[iRoute] || '').trim() || 'จาก Google Sheet',
-            custom: false
-          };
-        } else if(iMeta > -1 && cells[iMeta] && cells[iMeta].trim()){
-          ALL_TRAINS[trainNo].meta = cells[iMeta].trim();
-        }
-        ALL_TRAINS[trainNo].schedule[station] = { arr, dep };
-        rowCount++;
-      }
-      okCount++;
+      rowCount += await syncOneStation(station);
     }catch(e){
-      failCount++;
-      failedStations.push(station);
-      if(String(e.message||'').includes('429')) rateLimited++;
-      console.warn('[sheet sync] failed for station "' + station + '" (tab "' + tab + '"):', e.message || e);
+      stillFailing.push(station);
+      console.warn('[sheet sync] failed for station "' + station + '":', e.message || e);
     }
   });
 
+  // Sweep passes: anything still stuck is almost always Google's rate
+  // limiter cooling down, not a real problem with that station — so pause
+  // briefly and retry just the stragglers, until every station is in or
+  // we hit the deadline and give up on the rest for this load.
+  for(let sweep = 0; stillFailing.length && (Date.now() - startedAt) < SYNC_DEADLINE_MS; sweep++){
+    sheetSyncBarSet('🔄 กำลังซิงก์เพิ่มเติม (' + stillFailing.length + ' สถานีที่เหลือ)…', '');
+    await sleep(1200 + sweep * 600);
+    const retryThisSweep = stillFailing;
+    stillFailing = [];
+    await runWithConcurrency(retryThisSweep, 4, async (station)=>{
+      try{
+        rowCount += await syncOneStation(station);
+      }catch(e){
+        stillFailing.push(station);
+        console.warn('[sheet sync] still failing for station "' + station + '" after sweep ' + (sweep+1) + ':', e.message || e);
+      }
+    });
+  }
+
   sheetSyncInFlight = false;
-  if(okCount > 0 && failCount === 0){
-    sheetSyncBarSet('✅ ซิงก์จาก Google Sheet สำเร็จ (' + rowCount + ' รายการ) · ' +
+  const total = stationOrder.length;
+  const okCount = total - stillFailing.length;
+  if(stillFailing.length === 0){
+    sheetSyncBarSet('✅ ซิงก์จาก Google Sheet สำเร็จครบ (' + rowCount + ' รายการ) · ' +
       new Date().toLocaleTimeString('th-TH', {hour:'2-digit', minute:'2-digit'}), 'is-ok');
     setTimeout(()=>{ const bar = document.getElementById('sheetSyncBar'); if(bar) bar.hidden = true; }, 4000);
   } else if(okCount > 0){
-    const reason = rateLimited === failCount ? 'Google จำกัดจำนวนคำขอชั่วคราว' : 'บางสถานีดึงไม่สำเร็จ';
-    const shown = failedStations.slice(0, 3).join(', ') + (failedStations.length > 3 ? ' และอีก ' + (failedStations.length - 3) + ' สถานี' : '');
-    sheetSyncBarSet('⚠️ ซิงก์ได้บางส่วน (' + okCount + '/' + (okCount+failCount) + ' สถานี, ' + reason + '): ' + shown + ' — ใช้ข้อมูลออฟไลน์แทนสำหรับส่วนที่เหลือ', 'is-error');
+    sheetSyncBarSet('⚠️ ซิงก์ได้ ' + okCount + '/' + total + ' สถานี ใช้ข้อมูลออฟไลน์แทนสำหรับส่วนที่เหลือ', 'is-error');
   } else {
     sheetSyncBarSet('⚠️ ดึงข้อมูลจาก Google Sheet ไม่ได้ (อาจยังไม่ได้เปิดแชร์แบบสาธารณะ หรือ Google จำกัดคำขอชั่วคราว) กำลังใช้ตารางเวลาสำรองในเครื่อง', 'is-error');
   }
