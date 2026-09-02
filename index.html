@@ -2504,7 +2504,8 @@ function buildSummary(arrRes, depRes, meetArrRes, meetDepRes){
     const meetTrain = meetTrainSelect.value;
     const meetSched = meetSchedule() || {arr:'-', dep:'-'};
     meetPassOnly = (meetSched.arr === '-' && meetSched.dep !== '-');
-    lines.push(compactLine('ขบวน', meetTrain, meetArrActual, meetDepActual, meetArrRes, meetDepRes, meetPassOnly, true));
+    // ขบวนรถหลีก ไม่ต้องขึ้นคำว่า "ผ่าน" ในสรุป (ใช้แค่กับขบวนหลักเท่านั้น)
+    lines.push(compactLine('ขบวน', meetTrain, meetArrActual, meetDepActual, meetArrRes, meetDepRes, false, true));
   }
 
   document.getElementById('summaryText').textContent = lines.join('\n');
