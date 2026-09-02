@@ -2487,6 +2487,7 @@ function buildSummary(arrRes, depRes, meetArrRes, meetDepRes){
     }
 
     let out = labelPrefix + ' ' + trainNo;
+    if(passOnly) out += ' ผ่าน'; // ไม่มีเวลาถึงตามตาราง (ไม่จอด) — บันทึกไว้แค่เวลาที่ผ่าน
     if(timeStr) out += ' ' + timeStr;
     if(statusLabel) out += ' ' + statusLabel;
     if(withSuffix) out += ' ครับ';
