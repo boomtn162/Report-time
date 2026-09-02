@@ -2495,9 +2495,11 @@ function buildSummary(arrRes, depRes, meetArrRes, meetDepRes){
   }
 
   const meetActive = meetOn && meetTrainSelect.value && (meetArrActual || meetDepActual);
+  // ติ๊ก "มีขบวนรถหลีก" ไว้ = ขบวนหลักหยุดรอสับหลีกจริง ไม่ใช่แค่ผ่าน จึงไม่ต้องขึ้นคำว่า "ผ่าน"
+  const showPhanOnPrimary = primaryPassOnly && !meetOn;
 
   if(arrActual || depActual){
-    lines.push(compactLine('ขบวน', train, arrActual, depActual, arrRes, depRes, primaryPassOnly, !meetActive));
+    lines.push(compactLine('ขบวน', train, arrActual, depActual, arrRes, depRes, showPhanOnPrimary, !meetActive));
   }
 
   if(meetActive){
