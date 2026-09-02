@@ -1883,21 +1883,57 @@ function sheetSyncBarSet(text, cls){
   if(retryBtn) retryBtn.style.display = cls === 'is-error' ? 'inline-block' : 'none';
 }
 
+function sleep(ms){ return new Promise(res => setTimeout(res, ms)); }
+
+// Google's gviz endpoint rate-limits bursts of requests from the same
+// client (HTTP 429) — firing all ~37 station tabs at once reliably trips
+// it. Run only a few at a time, and retry a 429/5xx with backoff.
+async function fetchCsvWithRetry(url, attempts = 4){
+  for(let i = 0; i < attempts; i++){
+    let res;
+    try{
+      res = await fetch(url, { cache: 'no-store' });
+    }catch(e){
+      if(i === attempts - 1) throw e;
+      await sleep(400 * (i + 1) + Math.random() * 300);
+      continue;
+    }
+    if(res.ok) return await res.text();
+    if((res.status === 429 || res.status >= 500) && i < attempts - 1){
+      await sleep(500 * (i + 1) + Math.random() * 400); // backoff + jitter
+      continue;
+    }
+    throw new Error('HTTP ' + res.status);
+  }
+}
+
+// Simple bounded-concurrency runner so we never have more than `limit`
+// station fetches in flight at once.
+async function runWithConcurrency(items, limit, worker){
+  let next = 0;
+  async function runOne(){
+    while(next < items.length){
+      const i = next++;
+      await worker(items[i], i);
+    }
+  }
+  const runners = Array.from({length: Math.min(limit, items.length)}, runOne);
+  await Promise.all(runners);
+}
+
 let sheetSyncInFlight = false;
 async function syncFromGoogleSheet(){
   if(!GOOGLE_SHEET_ID || sheetSyncInFlight) return;
   sheetSyncInFlight = true;
   sheetSyncBarSet('🔄 กำลังซิงก์ตารางเวลาจาก Google Sheet…', '');
 
-  let okCount = 0, failCount = 0, rowCount = 0;
-  await Promise.all(stationOrder.map(async (station)=>{
+  let okCount = 0, failCount = 0, rowCount = 0, rateLimited = 0;
+  await runWithConcurrency(stationOrder, 5, async (station)=>{
     const tab = sheetTabName(station);
     const url = 'https://docs.google.com/spreadsheets/d/' + GOOGLE_SHEET_ID +
       '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(tab);
     try{
-      const res = await fetch(url, { cache: 'no-store' });
-      if(!res.ok) throw new Error('HTTP ' + res.status);
-      const csv = await res.text();
+      const csv = await fetchCsvWithRetry(url);
       const rows = parseCsv(csv);
       if(rows.length < 2) { okCount++; return; } // empty tab (header only, or truly empty) is fine
       const header = rows[0].map(h => h.trim());
@@ -1929,8 +1965,9 @@ async function syncFromGoogleSheet(){
       okCount++;
     }catch(e){
       failCount++;
+      if(String(e.message||'').includes('429')) rateLimited++;
     }
-  }));
+  });
 
   sheetSyncInFlight = false;
   if(okCount > 0 && failCount === 0){
@@ -1938,9 +1975,10 @@ async function syncFromGoogleSheet(){
       new Date().toLocaleTimeString('th-TH', {hour:'2-digit', minute:'2-digit'}), 'is-ok');
     setTimeout(()=>{ const bar = document.getElementById('sheetSyncBar'); if(bar) bar.hidden = true; }, 4000);
   } else if(okCount > 0){
-    sheetSyncBarSet('⚠️ ซิงก์ได้บางส่วน (' + okCount + '/' + (okCount+failCount) + ' สถานี) ใช้ข้อมูลออฟไลน์แทนสำหรับส่วนที่เหลือ', 'is-error');
+    const reason = rateLimited === failCount ? 'Google จำกัดจำนวนคำขอชั่วคราว' : 'บางสถานีดึงไม่สำเร็จ';
+    sheetSyncBarSet('⚠️ ซิงก์ได้บางส่วน (' + okCount + '/' + (okCount+failCount) + ' สถานี, ' + reason + ') ใช้ข้อมูลออฟไลน์แทนสำหรับส่วนที่เหลือ', 'is-error');
   } else {
-    sheetSyncBarSet('⚠️ ดึงข้อมูลจาก Google Sheet ไม่ได้ (อาจยังไม่ได้เปิดแชร์แบบสาธารณะ) กำลังใช้ตารางเวลาสำรองในเครื่อง', 'is-error');
+    sheetSyncBarSet('⚠️ ดึงข้อมูลจาก Google Sheet ไม่ได้ (อาจยังไม่ได้เปิดแชร์แบบสาธารณะ หรือ Google จำกัดคำขอชั่วคราว) กำลังใช้ตารางเวลาสำรองในเครื่อง', 'is-error');
   }
 
   // refresh whatever's currently on screen with the freshly-synced numbers
