@@ -1933,6 +1933,49 @@ function cleanHeaderCell(h){
   return String(h || '').replace(/[﻿​-‍]/g, '').trim();
 }
 
+// A "เวลาถึง"/"เวลาออก" cell someone typed as e.g. "9:23" without first
+// setting the column to Plain text gets auto-detected by Sheets as a TIME
+// value — and its CSV export then comes back as something other than the
+// literal text: seconds tacked on ("9:23:00"), a day-fraction decimal
+// ("0.391666..."), or a full datetime string (Sheets' time-only values are
+// stored against its 1899-12-30 epoch, e.g. "12/30/1899 9:23:00"). Handle
+// all of those so editors don't have to fight cell formatting every time.
+function normalizeSheetTime(raw){
+  let t = String(raw == null ? '' : raw).trim();
+  if(!t || t === '-') return '-';
+
+  // Plain "H:MM" / "H.MM" already in the format the app expects.
+  if(/^\d{1,2}[.:]\d{2}$/.test(t)) return t;
+
+  // "H:MM:SS" (with optional date prefix, e.g. Sheets' 1899-12-30 epoch
+  // for a time-only value) — keep just the H:MM.
+  let m = t.match(/(\d{1,2}):(\d{2}):\d{2}(?:\.\d+)?\s*(AM|PM|am|pm)?$/);
+  if(m){
+    let h = parseInt(m[1], 10);
+    if(m[3]){
+      const ap = m[3].toUpperCase();
+      if(ap === 'PM' && h < 12) h += 12;
+      if(ap === 'AM' && h === 12) h = 0;
+    }
+    return h + ':' + m[2];
+  }
+
+  // Bare day-fraction decimal (0–1, or with a whole-day integer part from
+  // a full datetime serial) — the raw numeric form of a TIME/DATETIME cell.
+  // Require an actual decimal point so a stray plain integer (never a
+  // legitimate time value here) doesn't get misread as a fraction of a day.
+  if(/^\d+\.\d+$/.test(t)){
+    const num = parseFloat(t);
+    const frac = num - Math.floor(num);
+    const totalMin = Math.round(frac * 24 * 60);
+    const h = Math.floor(totalMin / 60) % 24;
+    const mi = totalMin % 60;
+    return h + ':' + String(mi).padStart(2, '0');
+  }
+
+  return t; // unrecognized shape — pass through, schedToMinutes will just show '-'
+}
+
 async function syncOneStation(station){
   const tab = sheetTabName(station);
   const url = 'https://docs.google.com/spreadsheets/d/' + GOOGLE_SHEET_ID +
@@ -1966,8 +2009,8 @@ async function syncOneStation(station){
     const cells = rows[r];
     const trainNo = (cells[iTrain] || '').trim();
     if(!trainNo) continue;
-    const arr = (cells[iArr] || '-').trim() || '-';
-    const dep = (cells[iDep] || '-').trim() || '-';
+    const arr = normalizeSheetTime(cells[iArr]);
+    const dep = normalizeSheetTime(cells[iDep]);
     if(!ALL_TRAINS[trainNo]){
       ALL_TRAINS[trainNo] = {
         schedule: {},
