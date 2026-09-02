@@ -1926,6 +1926,13 @@ async function runWithConcurrency(items, limit, worker){
 
 // Fetch one station's tab and, on success, merge its rows into ALL_TRAINS.
 // Throws on failure so the caller can decide whether/when to retry it.
+// Strip a leading BOM and zero-width characters Sheets/Excel sometimes
+// leave behind in a pasted/imported header cell, then trim.
+function cleanHeaderCell(h){
+  // ﻿ = BOM, ​-‍ = zero-width space/ZWNJ/ZWJ
+  return String(h || '').replace(/[﻿​-‍]/g, '').trim();
+}
+
 async function syncOneStation(station){
   const tab = sheetTabName(station);
   const url = 'https://docs.google.com/spreadsheets/d/' + GOOGLE_SHEET_ID +
@@ -1934,14 +1941,28 @@ async function syncOneStation(station){
   const rows = parseCsv(csv);
   let rowsMerged = 0;
   if(rows.length < 2) return rowsMerged; // empty tab (header only, or truly empty) is fine
-  const header = rows[0].map(h => h.trim());
-  const iTrain = header.indexOf('ขบวน');
+
+  // The header is normally row 1, but tolerate a stray title/blank row
+  // above it (common after manual edits) by scanning the first few rows
+  // for one that actually contains "ขบวน".
+  let headerRowIdx = -1, header = null, iTrain = -1;
+  for(let r = 0; r < Math.min(5, rows.length); r++){
+    const candidate = rows[r].map(cleanHeaderCell);
+    const idx = candidate.indexOf('ขบวน');
+    if(idx !== -1){ headerRowIdx = r; header = candidate; iTrain = idx; break; }
+  }
+  if(headerRowIdx === -1){
+    throw new Error('unexpected header — first row(s) were: ' +
+      rows.slice(0, 3).map(r => JSON.stringify(r)).join(' | '));
+  }
   const iMeta = header.indexOf('ประเภท');
   const iRoute = header.indexOf('สาย');
   const iArr = header.indexOf('เวลาถึง');
   const iDep = header.indexOf('เวลาออก');
-  if(iTrain === -1 || iArr === -1 || iDep === -1) throw new Error('unexpected header');
-  for(let r = 1; r < rows.length; r++){
+  if(iArr === -1 || iDep === -1){
+    throw new Error('unexpected header — found "ขบวน" but missing เวลาถึง/เวลาออก in: ' + JSON.stringify(header));
+  }
+  for(let r = headerRowIdx + 1; r < rows.length; r++){
     const cells = rows[r];
     const trainNo = (cells[iTrain] || '').trim();
     if(!trainNo) continue;
