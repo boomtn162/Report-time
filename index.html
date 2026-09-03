@@ -2465,7 +2465,10 @@ function buildSummary(arrRes, depRes, meetArrRes, meetDepRes){
   // สถานะดีเลย์ยึดจาก "เวลาออก/ผ่าน" เป็นหลัก (ค่าล่าสุดที่มีผลต่อขบวน) ถ้าไม่มีค่อยใช้เวลาถึงแทน
   function compactLine(labelPrefix, trainNo, actualArr, actualDep, resArr, resDep, passOnly, withSuffix){
     let timeStr = '';
-    if(actualArr && actualDep){
+    if(actualArr && actualDep && actualArr === actualDep){
+      // เวลาถึง = เวลาออก เป๊ะ ๆ (เช่น ขบวนผ่าน กรอกเวลาเดียวไว้ทั้งสองช่อง) ไม่ต้องขึ้นซ้ำเป็นช่วง
+      timeStr = niceTime(actualArr);
+    } else if(actualArr && actualDep){
       const [hArr, mArr] = actualArr.split(':');
       const [hDep, mDep] = actualDep.split(':');
       timeStr = (hArr === hDep) ? (niceTime(actualArr) + ' - ' + mDep) : (niceTime(actualArr) + ' - ' + niceTime(actualDep));
