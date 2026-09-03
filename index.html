@@ -2655,8 +2655,10 @@ function buildSummary(arrRes, depRes, meetArrRes, meetDepRes){
   }
 
   const meetActive = meetOn && meetTrainSelect.value && (meetArrActual || meetDepActual);
-  // ติ๊ก "มีขบวนรถหลีก" ไว้ = ขบวนหลักหยุดรอสับหลีกจริง ไม่ใช่แค่ผ่าน จึงไม่ต้องขึ้นคำว่า "ผ่าน"
-  const showPhanOnPrimary = primaryPassOnly && !meetOn;
+  // "ผ่าน" ถ้าตารางบอกว่าไม่จอด (ไม่มีเวลาถึง) หรือกรอกเวลาถึง/ออกจริงเท่ากันเป๊ะ (แปลว่าขบวนแค่ผ่าน
+  // ไม่ได้จอดจริง) — ยกเว้นติ๊ก "มีขบวนรถหลีก" ไว้ ซึ่งแปลว่าขบวนหลักหยุดรอสับหลีกจริง ไม่ใช่แค่ผ่าน
+  const actualTimesEqual = !!(arrActual && depActual && arrActual === depActual);
+  const showPhanOnPrimary = (primaryPassOnly || actualTimesEqual) && !meetOn;
 
   if(arrActual || depActual){
     lines.push(compactLine('ขบวน', train, arrActual, depActual, arrRes, depRes, showPhanOnPrimary, !meetActive));
@@ -2679,7 +2681,7 @@ function buildSummary(arrRes, depRes, meetArrRes, meetDepRes){
     createdAtMs: nowMs,
     createdAtDisplay: new Date(nowMs).toLocaleString('th-TH', {dateStyle:'medium', timeStyle:'short'}),
     arr: arrActual ? {actual: niceTime(arrActual), text: shortDelay(arrRes), minutes: delayMinutesOf(arrRes)} : null,
-    dep: depActual ? {actual: niceTime(depActual), text: shortDelay(depRes), label: primaryPassOnly?'ผ่าน':'ออก', minutes: delayMinutesOf(depRes)} : null,
+    dep: depActual ? {actual: niceTime(depActual), text: shortDelay(depRes), label: showPhanOnPrimary?'ผ่าน':'ออก', minutes: delayMinutesOf(depRes)} : null,
     meet: meetActive ? {
       train: meetTrainSelect.value,
       arr: meetArrActual ? {actual: niceTime(meetArrActual), text: shortDelay(meetArrRes), minutes: delayMinutesOf(meetArrRes)} : null,
