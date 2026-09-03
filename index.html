@@ -169,6 +169,71 @@
     cursor:pointer;
     font-family:inherit;
   }
+  .tab-nav{
+    display:flex;
+    gap:8px;
+    padding:10px 16px;
+    background:var(--cream);
+    border-bottom:1px solid var(--line);
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+  .tab-nav-btn{
+    flex:1;
+    border:1px solid var(--line);
+    background:#fff;
+    color:var(--ink);
+    border-radius:10px;
+    padding:10px 8px;
+    font-size:13.5px;
+    font-weight:700;
+    font-family:inherit;
+    cursor:pointer;
+  }
+  .tab-nav-btn.is-active{
+    background:var(--maroon);
+    border-color:var(--maroon);
+    color:#fff;
+  }
+  .home-station-display{
+    font-size:17px;
+    font-weight:800;
+    color:var(--maroon);
+    padding:10px 12px;
+    background:var(--cream);
+    border-radius:10px;
+    border:1px solid var(--line);
+  }
+  .setup-steps{
+    margin:8px 0 12px;
+    padding-left:20px;
+    font-size:13px;
+    color:var(--ink);
+    line-height:1.7;
+  }
+  .code-block{
+    background:var(--board-bg);
+    color:#d8f0d0;
+    font-family:ui-monospace,'SFMono-Regular',Consolas,monospace;
+    font-size:11.5px;
+    line-height:1.55;
+    padding:12px;
+    border-radius:10px;
+    overflow-x:auto;
+    white-space:pre;
+    margin:0;
+    max-width:100%;
+    box-sizing:border-box;
+  }
+  .sheet-report-item{
+    padding:10px 0;
+    border-bottom:1px dashed var(--line);
+    font-size:13px;
+  }
+  .sheet-report-item:last-child{border-bottom:none;}
+  .sheet-report-item .row1{font-weight:700;color:var(--maroon-dark);}
+  .sheet-report-item .row2{color:#6b5d4f;margin-top:2px;white-space:pre-line;}
   .card h2 .num{
     display:inline-flex;
     align-items:center;
@@ -482,6 +547,28 @@
     border-color:#3a312b;
     color:#e2c48a;
   }
+  html[data-theme="dark"] .tab-nav{
+    background:#1b1613;
+    border-color:#3a312b;
+  }
+  html[data-theme="dark"] .tab-nav-btn{
+    background:#241d1a;
+    border-color:#3a312b;
+    color:#f1e9da;
+  }
+  html[data-theme="dark"] .tab-nav-btn.is-active{
+    background:var(--maroon);
+    border-color:var(--maroon);
+    color:#fff;
+  }
+  html[data-theme="dark"] .home-station-display{
+    background:#241d1a;
+    border-color:#3a312b;
+    color:#e2a85f;
+  }
+  html[data-theme="dark"] .setup-steps{color:#c9beac;}
+  html[data-theme="dark"] .sheet-report-item{border-color:#3a312b;}
+  html[data-theme="dark"] .sheet-report-item .row2{color:#a89a86;}
   html[data-theme="dark"] .card h2{
     color:#e2a85f;
   }
@@ -596,12 +683,18 @@
   <button type="button" id="sheetSyncRetryBtn" style="display:none;">ลองใหม่</button>
 </div>
 
-<main>
+<nav class="tab-nav" id="tabNav">
+  <button type="button" class="tab-nav-btn is-active" id="tabBtnReport" data-tab="report">🕐 รายงานเวลา</button>
+  <button type="button" class="tab-nav-btn" id="tabBtnSettings" data-tab="settings">⚙️ ตั้งค่า</button>
+</nav>
 
-  <div class="card">
+<main>
+<div id="tabPanelReport">
+
+  <div class="card" id="homeStationDisplayCard">
     <h2><span class="num">1</span>สถานีที่ปฏิบัติงาน</h2>
-    <label for="stationSelect">สถานี</label>
-    <select id="stationSelect"></select>
+    <div id="homeStationDisplay" class="home-station-display">—</div>
+    <button type="button" class="btn-ghost" id="goToStationSettingsBtn" style="width:100%;margin-top:8px;">แก้ไขสถานีที่แท็บตั้งค่า</button>
   </div>
 
   <div class="card">
@@ -784,6 +877,51 @@
       ข้อมูลประวัติจะถูกเก็บไว้ในเบราว์เซอร์นี้เท่านั้น
     </div>
   </div>
+
+</div>
+
+<div id="tabPanelSettings" style="display:none;">
+
+  <div class="card">
+    <h2><span class="num">1</span>สถานีที่ปฏิบัติ</h2>
+    <label for="stationSelect">เลือกสถานีที่ปฏิบัติงาน</label>
+    <select id="stationSelect"></select>
+    <div class="note">สถานีนี้จะถูกจำไว้เป็นค่าเริ่มต้นทุกครั้งที่เปิดแอป และแสดงในแท็บ "รายงานเวลา"</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">2</span>เชื่อมต่อ Google Sheet</h2>
+    <label for="sheetIdInput">รหัส Google Sheet (วางลิงก์ทั้งหมดก็ได้)</label>
+    <input type="text" id="sheetIdInput" placeholder="เช่น 1WXh3648c_Nm9H55PkTOschM8tAvBJlIwGsYRa4J38FA">
+    <label for="appsScriptUrlInput" style="margin-top:10px;display:block;">Apps Script Web App URL (สำหรับบันทึกรายงานเข้า Sheet)</label>
+    <input type="text" id="appsScriptUrlInput" placeholder="https://script.google.com/macros/s/xxxxx/exec">
+    <div class="btn-row" style="margin-top:10px;">
+      <button type="button" class="btn-primary" id="saveSheetSettingsBtn" style="flex:1;">บันทึกการตั้งค่า</button>
+    </div>
+    <div id="sheetSettingsSavedNote" class="note" style="display:none;color:var(--ontime);">บันทึกแล้ว — กำลังซิงก์ใหม่…</div>
+
+    <div class="divider-label" style="margin-top:16px;">วิธีเปิดใช้งานการบันทึกลง Google Sheet (ทำครั้งเดียว)</div>
+    <ol class="setup-steps">
+      <li>เปิด Google Sheet ของคุณ → เมนู <b>Extensions → Apps Script</b></li>
+      <li>ลบโค้ดเดิมทั้งหมด แล้ววางโค้ดด้านล่างนี้แทน</li>
+      <li>กด <b>Deploy → New deployment</b> → เลือกประเภท <b>Web app</b></li>
+      <li>ตั้งค่า Execute as: <b>Me</b>, Who has access: <b>Anyone</b> → กด <b>Deploy</b></li>
+      <li>คัดลอก URL ที่ได้ มาวางในช่อง "Apps Script Web App URL" ด้านบน แล้วกดบันทึก</li>
+    </ol>
+    <button type="button" class="btn-ghost" id="copyAppsScriptBtn" style="width:100%;margin-bottom:6px;">📋 คัดลอกโค้ด Apps Script</button>
+    <pre id="appsScriptCode" class="code-block"></pre>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">3</span>รายงานที่บันทึกไว้ (จาก Google Sheet)</h2>
+    <div class="search-row">
+      <input type="text" id="sheetReportsSearch" placeholder="ค้นหาสถานี/ขบวน...">
+    </div>
+    <div id="sheetReportsStatus" class="note">—</div>
+    <div id="sheetReportsList"></div>
+  </div>
+
+</div>
 
 </main>
 
@@ -1837,7 +1975,20 @@ Object.entries(SCHEDULE_DATA.routes).forEach(([routeName, route])=>{
 // (matching how SCHEDULE_DATA groups stationSchedules), columns
 // ขบวน | ประเภท | สาย | เวลาถึง | เวลาออก. Editing a row in the sheet and
 // reloading this page is enough — no code changes needed.
-const GOOGLE_SHEET_ID = '1WXh3648c_Nm9H55PkTOschM8tAvBJlIwGsYRa4J38FA';
+// Both of these can be overridden per-device from the ตั้งค่า tab
+// (storage keys 'pref:sheetId' / 'pref:appsScriptUrl'); these are just the
+// defaults baked into the page.
+let GOOGLE_SHEET_ID = '1WXh3648c_Nm9H55PkTOschM8tAvBJlIwGsYRa4J38FA';
+let APPS_SCRIPT_URL = '';
+const REPORTS_SHEET_TAB = 'รายงาน';
+
+// Accepts either a bare Sheet ID or a full Google Sheets URL pasted in.
+function extractSheetId(raw){
+  const t = String(raw || '').trim();
+  const m = t.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  if(m) return m[1];
+  return t;
+}
 
 function sheetTabName(station){
   // Google Sheets tab names can't contain : \ / ? * [ ]
@@ -2623,6 +2774,7 @@ saveBtn.addEventListener('click', async ()=>{
   trackUsage(reportToSave.station, reportToSave.train);
   if(reportToSave.meet) trackUsage(reportToSave.station, reportToSave.meet.train);
   if(historyCard.style.display !== 'none') renderHistory();
+  postReportToSheet(reportToSave); // best-effort, doesn't block the local save above
   saveBtn.disabled = false;
 });
 
@@ -2913,10 +3065,223 @@ themeToggleBtn.addEventListener('click', async ()=>{
   await storageSet('pref:theme', next);
 });
 
+function escapeHtml(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[c]));
+}
+
+// ---------- Settings tab: 2-tab shell, station, Google Sheet config, saved reports ----------
+const tabBtnReport = document.getElementById('tabBtnReport');
+const tabBtnSettings = document.getElementById('tabBtnSettings');
+const tabPanelReport = document.getElementById('tabPanelReport');
+const tabPanelSettings = document.getElementById('tabPanelSettings');
+
+function showTab(tab){
+  const isReport = tab !== 'settings';
+  tabPanelReport.style.display = isReport ? 'block' : 'none';
+  tabPanelSettings.style.display = isReport ? 'none' : 'block';
+  tabBtnReport.classList.toggle('is-active', isReport);
+  tabBtnSettings.classList.toggle('is-active', !isReport);
+  storageSet('pref:activeTab', tab);
+  if(!isReport){
+    updateSheetSettingsInputs();
+    fetchSavedReportsFromSheet();
+  }
+}
+tabBtnReport.addEventListener('click', ()=>showTab('report'));
+tabBtnSettings.addEventListener('click', ()=>showTab('settings'));
+document.getElementById('goToStationSettingsBtn').addEventListener('click', ()=>showTab('settings'));
+
+function updateHomeStationDisplay(){
+  const el = document.getElementById('homeStationDisplay');
+  if(el) el.textContent = stationSelect.value || '— ยังไม่ได้เลือก —';
+}
+stationSelect.addEventListener('change', updateHomeStationDisplay);
+
+function updateSheetSettingsInputs(){
+  const idInput = document.getElementById('sheetIdInput');
+  const urlInput = document.getElementById('appsScriptUrlInput');
+  if(idInput) idInput.value = GOOGLE_SHEET_ID;
+  if(urlInput) urlInput.value = APPS_SCRIPT_URL;
+}
+
+document.getElementById('saveSheetSettingsBtn').addEventListener('click', async ()=>{
+  const idInput = document.getElementById('sheetIdInput');
+  const urlInput = document.getElementById('appsScriptUrlInput');
+  const newId = extractSheetId(idInput.value);
+  const newUrl = urlInput.value.trim();
+  if(newId){ GOOGLE_SHEET_ID = newId; await storageSet('pref:sheetId', newId); }
+  APPS_SCRIPT_URL = newUrl;
+  await storageSet('pref:appsScriptUrl', newUrl);
+  updateSheetSettingsInputs();
+  const savedNote = document.getElementById('sheetSettingsSavedNote');
+  savedNote.style.display = 'block';
+  setTimeout(()=>{ savedNote.style.display = 'none'; }, 3000);
+  syncFromGoogleSheet();
+  fetchSavedReportsFromSheet();
+});
+
+// Apps Script source the user pastes into Extensions > Apps Script, once, to
+// let this static page (no backend of its own) append rows to their Sheet.
+const APPS_SCRIPT_SOURCE = "function doPost(e) {\n" +
+  "  var SHEET_NAME = 'รายงาน';\n" +
+  "  var ss = SpreadsheetApp.getActiveSpreadsheet();\n" +
+  "  var sheet = ss.getSheetByName(SHEET_NAME);\n" +
+  "  if (!sheet) {\n" +
+  "    sheet = ss.insertSheet(SHEET_NAME);\n" +
+  "    sheet.appendRow(['วันที่','วันที่เวลา','สถานี','ขบวน','ถึง','ผลถึง','ออก/ผ่าน','ผลออก','ขบวนหลีก','หลีกถึง','ผลหลีกถึง','หลีกออก','ผลหลีกออก','สรุปรายงาน']);\n" +
+  "  }\n" +
+  "  var data = JSON.parse(e.postData.contents);\n" +
+  "  sheet.appendRow([\n" +
+  "    data.date || '',\n" +
+  "    data.createdAtDisplay || '',\n" +
+  "    data.station || '',\n" +
+  "    data.train || '',\n" +
+  "    data.arrActual || '',\n" +
+  "    data.arrText || '',\n" +
+  "    data.depLine || '',\n" +
+  "    data.depText || '',\n" +
+  "    data.meetTrain || '',\n" +
+  "    data.meetArrActual || '',\n" +
+  "    data.meetArrText || '',\n" +
+  "    data.meetDepActual || '',\n" +
+  "    data.meetDepText || '',\n" +
+  "    data.summaryText || ''\n" +
+  "  ]);\n" +
+  "  return ContentService.createTextOutput(JSON.stringify({ok: true}))\n" +
+  "    .setMimeType(ContentService.MimeType.JSON);\n" +
+  "}\n" +
+  "\n" +
+  "function doGet(e) {\n" +
+  "  return ContentService.createTextOutput(JSON.stringify({ok: true, message: 'Report-time backend is running'}))\n" +
+  "    .setMimeType(ContentService.MimeType.JSON);\n" +
+  "}";
+
+const appsScriptCodeEl = document.getElementById('appsScriptCode');
+if(appsScriptCodeEl) appsScriptCodeEl.textContent = APPS_SCRIPT_SOURCE;
+document.getElementById('copyAppsScriptBtn').addEventListener('click', async ()=>{
+  try{
+    await navigator.clipboard.writeText(APPS_SCRIPT_SOURCE);
+    showToast('คัดลอกโค้ดแล้ว');
+  }catch(e){
+    showToast('คัดลอกไม่สำเร็จ ลองเลือกข้อความเองแทน');
+  }
+});
+
+// Best-effort POST of one saved report into the Sheet's "รายงาน" tab via the
+// user's Apps Script Web App. Local save (storageSet, in the saveBtn handler)
+// is always the reliable copy — this is an additional sync layer, silently
+// skipped if no Apps Script URL is configured, and never blocks local save.
+async function postReportToSheet(report){
+  if(!APPS_SCRIPT_URL) return;
+  const d = new Date(report.createdAtMs);
+  const pad = n => String(n).padStart(2,'0');
+  const isoDate = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+  const payload = {
+    date: isoDate,
+    createdAtDisplay: report.createdAtDisplay || '',
+    station: report.stationShort || report.station || '',
+    train: report.train || '',
+    arrActual: report.arr ? report.arr.actual : '',
+    arrText: report.arr ? report.arr.text : '',
+    depLine: report.dep ? ((report.dep.label || 'ออก') + ' ' + report.dep.actual) : '',
+    depText: report.dep ? report.dep.text : '',
+    meetTrain: report.meet ? report.meet.train : '',
+    meetArrActual: (report.meet && report.meet.arr) ? report.meet.arr.actual : '',
+    meetArrText: (report.meet && report.meet.arr) ? report.meet.arr.text : '',
+    meetDepActual: (report.meet && report.meet.dep) ? report.meet.dep.actual : '',
+    meetDepText: (report.meet && report.meet.dep) ? report.meet.dep.text : '',
+    summaryText: document.getElementById('summaryText') ? document.getElementById('summaryText').textContent : ''
+  };
+  try{
+    // text/plain avoids a CORS preflight the Apps Script Web App can't answer;
+    // e.postData.contents on the other end is still the raw JSON regardless.
+    await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify(payload)
+    });
+  }catch(e){
+    console.warn('[sheet report] POST failed:', e.message || e);
+  }
+}
+
+let sheetReportsCache = [];
+let sheetReportsInFlight = false;
+async function fetchSavedReportsFromSheet(){
+  const statusEl = document.getElementById('sheetReportsStatus');
+  const listEl = document.getElementById('sheetReportsList');
+  if(!statusEl || !listEl) return;
+  if(!GOOGLE_SHEET_ID){
+    statusEl.textContent = 'ยังไม่ได้ตั้งค่า Google Sheet';
+    listEl.innerHTML = '';
+    return;
+  }
+  if(sheetReportsInFlight) return;
+  sheetReportsInFlight = true;
+  statusEl.textContent = '🔄 กำลังโหลด...';
+  const url = 'https://docs.google.com/spreadsheets/d/' + GOOGLE_SHEET_ID +
+    '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(REPORTS_SHEET_TAB);
+  try{
+    const csv = await fetchCsvWithRetry(url);
+    const rows = parseCsv(csv);
+    if(rows.length < 2){
+      sheetReportsCache = [];
+      statusEl.textContent = 'ยังไม่มีรายงานในชีต (แท็บ "' + REPORTS_SHEET_TAB + '")';
+    } else {
+      const header = rows[0].map(cleanHeaderCell);
+      const idx = name => header.indexOf(name);
+      const iDateTime = idx('วันที่เวลา'), iStation = idx('สถานี'), iTrain = idx('ขบวน'),
+        iSummary = idx('สรุปรายงาน');
+      sheetReportsCache = rows.slice(1).reverse().map(cells => ({
+        dateTime: iDateTime > -1 ? (cells[iDateTime]||'') : '',
+        station: iStation > -1 ? (cells[iStation]||'') : '',
+        train: iTrain > -1 ? (cells[iTrain]||'') : '',
+        summary: iSummary > -1 ? (cells[iSummary]||'') : cells.join(' ')
+      })).filter(r => r.station || r.train || r.summary);
+      statusEl.textContent = 'พบ ' + sheetReportsCache.length + ' รายงาน';
+    }
+  }catch(e){
+    statusEl.textContent = '⚠️ โหลดรายงานไม่สำเร็จ: ' + (e.message || e);
+    console.warn('[sheet reports] fetch failed:', e.message || e);
+  }
+  sheetReportsInFlight = false;
+  renderSheetReports();
+}
+
+function renderSheetReports(){
+  const listEl = document.getElementById('sheetReportsList');
+  const searchEl = document.getElementById('sheetReportsSearch');
+  if(!listEl) return;
+  const q = (searchEl && searchEl.value || '').trim().toLowerCase();
+  const items = q
+    ? sheetReportsCache.filter(r => (r.station+' '+r.train+' '+r.summary).toLowerCase().includes(q))
+    : sheetReportsCache;
+  if(items.length === 0){
+    listEl.innerHTML = '<div class="empty-hint">' + (q ? 'ไม่พบรายการที่ค้นหา' : 'ยังไม่มีรายงาน') + '</div>';
+    return;
+  }
+  listEl.innerHTML = items.slice(0, 200).map(r =>
+    '<div class="sheet-report-item"><div class="row1">' +
+    escapeHtml(r.station) + ' · ขบวน ' + escapeHtml(r.train) + '</div><div class="row2">' +
+    escapeHtml(r.dateTime) + (r.summary ? ('\n' + escapeHtml(r.summary)) : '') + '</div></div>'
+  ).join('');
+}
+document.getElementById('sheetReportsSearch').addEventListener('input', renderSheetReports);
+
 // init
 (async function init(){
   const savedTheme = await storageGet('pref:theme');
   if(savedTheme) applyTheme(savedTheme);
+
+  // ตั้งค่า Sheet/Apps Script ที่บันทึกไว้ในเครื่องนี้ (ถ้ามี) มาแทนค่าเริ่มต้น
+  // ก่อนที่จะเริ่มซิงก์ ให้แน่ใจว่าซิงก์ถูก Sheet ตั้งแต่รอบแรก
+  const savedSheetId = await storageGet('pref:sheetId');
+  if(savedSheetId) GOOGLE_SHEET_ID = savedSheetId;
+  const savedAppsScriptUrl = await storageGet('pref:appsScriptUrl');
+  if(savedAppsScriptUrl) APPS_SCRIPT_URL = savedAppsScriptUrl;
+  updateSheetSettingsInputs();
 
   await loadCustomTrains();
   renderStationOptions();
@@ -2926,6 +3291,7 @@ themeToggleBtn.addEventListener('click', async ()=>{
   if(lastStation && stationSeen.has(lastStation)){
     stationSelect.value = lastStation;
   }
+  updateHomeStationDisplay();
   populateTrains();
   const lastTrain = await storageGet('lastSelection:train');
   if(lastTrain){
@@ -2933,6 +3299,9 @@ themeToggleBtn.addEventListener('click', async ()=>{
     if(hasOption) trainSelect.value = lastTrain;
   }
   updateBadgeAndSchedule();
+
+  const savedTab = await storageGet('pref:activeTab');
+  showTab(savedTab === 'settings' ? 'settings' : 'report');
 
   // Kick off the Google Sheet sync in the background — the UI above is
   // already usable with the offline timetable, this just overlays live edits.
