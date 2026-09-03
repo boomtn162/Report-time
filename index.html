@@ -3137,6 +3137,7 @@ const APPS_SCRIPT_SOURCE = "function doPost(e) {\n" +
   "  if (!sheet) {\n" +
   "    sheet = ss.insertSheet(SHEET_NAME);\n" +
   "    sheet.appendRow(['วันที่','วันที่เวลา','สถานี','ขบวน','ถึง','ผลถึง','ออก/ผ่าน','ผลออก','ขบวนหลีก','หลีกถึง','ผลหลีกถึง','หลีกออก','ผลหลีกออก','สรุปรายงาน']);\n" +
+  "    formatReportHeader(sheet);\n" +
   "  }\n" +
   "  var data = JSON.parse(e.postData.contents);\n" +
   "  sheet.appendRow([\n" +
@@ -3155,6 +3156,7 @@ const APPS_SCRIPT_SOURCE = "function doPost(e) {\n" +
   "    data.meetDepText || '',\n" +
   "    data.summaryText || ''\n" +
   "  ]);\n" +
+  "  formatReportRow(sheet, sheet.getLastRow());\n" +
   "  return ContentService.createTextOutput(JSON.stringify({ok: true}))\n" +
   "    .setMimeType(ContentService.MimeType.JSON);\n" +
   "}\n" +
@@ -3162,6 +3164,55 @@ const APPS_SCRIPT_SOURCE = "function doPost(e) {\n" +
   "function doGet(e) {\n" +
   "  return ContentService.createTextOutput(JSON.stringify({ok: true, message: 'Report-time backend is running'}))\n" +
   "    .setMimeType(ContentService.MimeType.JSON);\n" +
+  "}\n" +
+  "\n" +
+  "// ---------- Formatting: bold header, sensible widths, color-coded results ----------\n" +
+  "var REPORT_COLS = 14;\n" +
+  "\n" +
+  "function formatReportHeader(sheet) {\n" +
+  "  var headerRange = sheet.getRange(1, 1, 1, REPORT_COLS);\n" +
+  "  headerRange.setFontWeight('bold')\n" +
+  "    .setFontColor('#ffffff')\n" +
+  "    .setBackground('#7a1f2b')\n" +
+  "    .setHorizontalAlignment('center')\n" +
+  "    .setVerticalAlignment('middle')\n" +
+  "    .setWrap(true);\n" +
+  "  sheet.setFrozenRows(1);\n" +
+  "  sheet.setRowHeight(1, 34);\n" +
+  "  var widths = [95, 130, 130, 60, 65, 95, 110, 95, 90, 70, 95, 70, 95, 340];\n" +
+  "  for (var i = 0; i < widths.length; i++) sheet.setColumnWidth(i + 1, widths[i]);\n" +
+  "}\n" +
+  "\n" +
+  "function formatReportRow(sheet, row) {\n" +
+  "  var range = sheet.getRange(row, 1, 1, REPORT_COLS);\n" +
+  "  range.setBorder(true, true, true, true, true, true, '#e3d9c8', SpreadsheetApp.BorderStyle.SOLID);\n" +
+  "  range.setVerticalAlignment('top');\n" +
+  "  range.setBackground(row % 2 === 0 ? '#faf6ef' : '#ffffff');\n" +
+  "  sheet.getRange(row, REPORT_COLS).setWrap(true); // สรุปรายงาน\n" +
+  "  colorizeResult(sheet.getRange(row, 6));  // ผลถึง\n" +
+  "  colorizeResult(sheet.getRange(row, 8));  // ผลออก\n" +
+  "  colorizeResult(sheet.getRange(row, 11)); // ผลหลีกถึง\n" +
+  "  colorizeResult(sheet.getRange(row, 13)); // ผลหลีกออก\n" +
+  "}\n" +
+  "\n" +
+  "function colorizeResult(cell) {\n" +
+  "  var v = String(cell.getValue() || '');\n" +
+  "  var color = '#2b2320';\n" +
+  "  if (v.indexOf('ช้า') === 0) color = '#b3261e';\n" +
+  "  else if (v.indexOf('ตรงเวลา') === 0) color = '#2e7d32';\n" +
+  "  else if (v.indexOf('เร็ว') === 0) color = '#1565c0';\n" +
+  "  cell.setFontColor(color).setFontWeight('bold');\n" +
+  "}\n" +
+  "\n" +
+  "// Run this once from the Apps Script editor (select it in the function\n" +
+  "// dropdown at the top, then click ▶ Run) to format rows that were added\n" +
+  "// before this formatting code was in place — new rows format themselves.\n" +
+  "function formatExistingReportSheet() {\n" +
+  "  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('รายงาน');\n" +
+  "  if (!sheet) return;\n" +
+  "  formatReportHeader(sheet);\n" +
+  "  var lastRow = sheet.getLastRow();\n" +
+  "  for (var r = 2; r <= lastRow; r++) formatReportRow(sheet, r);\n" +
   "}";
 
 const appsScriptCodeEl = document.getElementById('appsScriptCode');
