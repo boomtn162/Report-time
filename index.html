@@ -3197,13 +3197,24 @@ async function postReportToSheet(report){
   try{
     // text/plain avoids a CORS preflight the Apps Script Web App can't answer;
     // e.postData.contents on the other end is still the raw JSON regardless.
-    await fetch(APPS_SCRIPT_URL, {
+    const res = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
       headers: {'Content-Type': 'text/plain;charset=utf-8'},
       body: JSON.stringify(payload)
     });
+    const text = await res.text().catch(()=>'(อ่านผลลัพธ์ไม่ได้)');
+    if(res.ok){
+      console.log('[sheet report] POST ok:', res.status, text);
+    } else {
+      console.warn('[sheet report] POST returned non-OK:', res.status, res.statusText, text);
+      showToast('⚠️ ส่งเข้า Google Sheet ไม่สำเร็จ (' + res.status + ') — บันทึกในเครื่องแล้ว ดูรายละเอียดใน Console');
+    }
   }catch(e){
-    console.warn('[sheet report] POST failed:', e.message || e);
+    // A fetch that throws here is almost always the browser blocking the
+    // request outright (CORS, mixed-content, no network) before it ever
+    // reached Apps Script — the message below is exactly what to screenshot.
+    console.warn('[sheet report] POST failed before reaching Apps Script:', e.message || e, e);
+    showToast('⚠️ ส่งเข้า Google Sheet ไม่สำเร็จ — บันทึกในเครื่องแล้ว ดูรายละเอียดใน Console');
   }
 }
 
