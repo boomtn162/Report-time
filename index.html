@@ -874,7 +874,7 @@
       <button class="btn-ghost" id="exportCsvBtn" style="flex:1;">⬇️ ส่งออก CSV</button>
     </div>
     <div class="note">
-      ข้อมูลประวัติจะถูกเก็บไว้ในเบราว์เซอร์นี้เท่านั้น
+      ประวัตินี้ดึงจาก Google Sheet สด ๆ ทุกครั้งที่เปิด — เห็นรายการเดียวกันไม่ว่าจะเปิดจากเครื่องหรือแอปไหน
     </div>
   </div>
 
@@ -2771,7 +2771,7 @@ saveBtn.addEventListener('click', async ()=>{
   const reportToSave = currentReport;
   const key = 'report:' + reportToSave.createdAtMs + '-' + Math.random().toString(36).slice(2,7);
   const wasCloudWorking = storageIsWorking;
-  await storageSet(key, JSON.stringify(reportToSave));
+  await storageSet(key, JSON.stringify(reportToSave)); // local copy — always kept, offline-safe backup
   if(storageIsWorking){
     showToast('บันทึกลงประวัติแล้ว');
   } else if(wasCloudWorking){
@@ -2781,8 +2781,10 @@ saveBtn.addEventListener('click', async ()=>{
   }
   trackUsage(reportToSave.station, reportToSave.train);
   if(reportToSave.meet) trackUsage(reportToSave.station, reportToSave.meet.train);
+  // ประวัติที่แสดงในแอปตอนนี้ดึงจาก Google Sheet ล้วนๆ (ดูฟังก์ชัน loadAllReports)
+  // เลยต้องรอ POST เข้า Sheet ก่อน ไม่งั้นแผงประวัติจะยังไม่เห็นรายการที่เพิ่งบันทึก
+  await postReportToSheet(reportToSave, key);
   if(historyCard.style.display !== 'none') renderHistory();
-  postReportToSheet(reportToSave); // best-effort, doesn't block the local save above
   saveBtn.disabled = false;
 });
 
@@ -2798,18 +2800,81 @@ if(navigator.share){
 }
 
 // ---------- History panel ----------
+// Reads live from the Sheet's "รายงาน" tab — the same tab บันทึกลงประวัติ
+// writes into (see postReportToSheet) — so history is shared across every
+// device instead of stuck in one browser's local storage.
 let allReportsCache = [];
 
+function parseDelayMinutes_(text){
+  if(!text) return null;
+  const t = String(text);
+  if(t.indexOf('ตรงเวลา') === 0) return 0;
+  let m = t.match(/^ช้า\s*(\d+)/);
+  if(m) return parseInt(m[1], 10);
+  m = t.match(/^เร็ว\s*(\d+)/);
+  if(m) return -parseInt(m[1], 10);
+  return null;
+}
+
+// "ผ่าน 14:00" / "ออก 14:05" -> {label, actual}
+function splitDepLine_(line){
+  const t = String(line || '').trim();
+  if(!t || t === '-') return null;
+  const m = t.match(/^(ผ่าน|ออก)\s+(.+)$/);
+  if(m) return {label: m[1], actual: m[2]};
+  return {label: 'ออก', actual: t};
+}
+
 async function loadAllReports(){
+  if(!GOOGLE_SHEET_ID) return [];
   try{
-    const keys = await storageListKeys('report:');
-    const items = await Promise.all(keys.map(async k=>{
-      const raw = await storageGet(k);
-      if(!raw) return null;
-      try{ return {key:k, data: JSON.parse(raw)}; }catch(e){ return null; }
-    }));
-    return items.filter(Boolean).sort((a,b)=> (b.data.createdAtMs||0) - (a.data.createdAtMs||0));
+    const url = 'https://docs.google.com/spreadsheets/d/' + GOOGLE_SHEET_ID +
+      '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(REPORTS_SHEET_TAB);
+    const csv = await fetchCsvWithRetry(url);
+    const rows = parseCsv(csv);
+    if(rows.length < 2) return [];
+    const header = rows[0].map(cleanHeaderCell);
+    const idx = name => header.indexOf(name);
+    const cols = {
+      date: idx('วันที่'), dateTime: idx('วันที่เวลา'), station: idx('สถานี'), train: idx('ขบวน'),
+      arr: idx('ถึง'), arrText: idx('ผลถึง'), dep: idx('ออก/ผ่าน'), depText: idx('ผลออก'),
+      meetTrain: idx('ขบวนหลีก'), meetArr: idx('หลีกถึง'), meetArrText: idx('ผลหลีกถึง'),
+      meetDep: idx('หลีกออก'), meetDepText: idx('ผลหลีกออก'), id: idx('รหัส')
+    };
+    const cell = (r, i) => (i > -1 && r[i] != null) ? String(r[i]).trim() : '';
+
+    const items = rows.slice(1).map((r, i) => {
+      const train = cell(r, cols.train);
+      if(!train) return null;
+      const arrActual = cell(r, cols.arr);
+      const dep = splitDepLine_(cell(r, cols.dep));
+      const meetTrain = cell(r, cols.meetTrain);
+      const meetArrActual = cell(r, cols.meetArr);
+      const meetDepActual = cell(r, cols.meetDep);
+      const isoDate = cell(r, cols.date);
+      const id = cell(r, cols.id);
+      return {
+        key: id || ('sheetrow:' + i), // rows saved before the id column existed can't be deleted from the app
+        data: {
+          stationShort: cell(r, cols.station),
+          train,
+          createdAtMs: isoDate ? Date.parse(isoDate + 'T00:00:00') : 0,
+          createdAtDisplay: cell(r, cols.dateTime),
+          arr: arrActual ? {actual: arrActual, text: cell(r, cols.arrText), minutes: parseDelayMinutes_(cell(r, cols.arrText))} : null,
+          dep: dep ? {actual: dep.actual, text: cell(r, cols.depText), label: dep.label, minutes: parseDelayMinutes_(cell(r, cols.depText))} : null,
+          meet: meetTrain ? {
+            train: meetTrain,
+            arr: meetArrActual ? {actual: meetArrActual, text: cell(r, cols.meetArrText), minutes: parseDelayMinutes_(cell(r, cols.meetArrText))} : null,
+            dep: meetDepActual ? {actual: meetDepActual, text: cell(r, cols.meetDepText), minutes: parseDelayMinutes_(cell(r, cols.meetDepText))} : null
+          } : null
+        }
+      };
+    }).filter(Boolean);
+
+    // Sheet rows are already in the order they were saved (oldest first) — newest first for display.
+    return items.reverse();
   }catch(e){
+    console.warn('[history] failed to load from sheet:', e.message || e);
     return [];
   }
 }
@@ -2936,8 +3001,9 @@ function renderHistoryFiltered(){
     btn.addEventListener('click', async ()=>{
       const key = btn.getAttribute('data-key');
       btn.disabled = true;
-      await storageDelete(key);
-      renderHistory();
+      const deleted = await deleteReportFromSheet(key);
+      if(deleted) renderHistory();
+      else btn.disabled = false;
     });
   });
 }
@@ -3132,16 +3198,19 @@ document.getElementById('saveSheetSettingsBtn').addEventListener('click', async 
 
 // Apps Script source the user pastes into Extensions > Apps Script, once, to
 // let this static page (no backend of its own) append rows to their Sheet.
-const APPS_SCRIPT_SOURCE = "function doPost(e) {\n" +
-  "  var SHEET_NAME = 'รายงาน';\n" +
-  "  var ss = SpreadsheetApp.getActiveSpreadsheet();\n" +
-  "  var sheet = ss.getSheetByName(SHEET_NAME);\n" +
-  "  if (!sheet) {\n" +
-  "    sheet = ss.insertSheet(SHEET_NAME);\n" +
-  "    sheet.appendRow(['วันที่','วันที่เวลา','สถานี','ขบวน','ถึง','ผลถึง','ออก/ผ่าน','ผลออก','ขบวนหลีก','หลีกถึง','ผลหลีกถึง','หลีกออก','ผลหลีกออก','สรุปรายงาน']);\n" +
-  "    formatReportHeader(sheet);\n" +
-  "  }\n" +
+const APPS_SCRIPT_SOURCE =   "var SHEET_NAME = 'รายงาน';\n" +
+  "var HEADER = ['วันที่','วันที่เวลา','สถานี','ขบวน','ถึง','ผลถึง','ออก/ผ่าน','ผลออก','ขบวนหลีก','หลีกถึง','ผลหลีกถึง','หลีกออก','ผลหลีกออก','สรุปรายงาน','รหัส'];\n" +
+  "var REPORT_COLS = HEADER.length; // 15 — last one (รหัส) is hidden, used only to find/delete a row\n" +
+  "\n" +
+  "function doPost(e) {\n" +
+  "  var sheet = getOrCreateReportSheet_();\n" +
   "  var data = JSON.parse(e.postData.contents);\n" +
+  "\n" +
+  "  if (data.action === 'delete') {\n" +
+  "    var deleted = deleteReportRow_(sheet, data.id);\n" +
+  "    return jsonOut_({ok: true, deleted: deleted});\n" +
+  "  }\n" +
+  "\n" +
   "  sheet.appendRow([\n" +
   "    data.date || '',\n" +
   "    data.createdAtDisplay || '',\n" +
@@ -3156,21 +3225,50 @@ const APPS_SCRIPT_SOURCE = "function doPost(e) {\n" +
   "    data.meetArrText || '',\n" +
   "    data.meetDepActual || '',\n" +
   "    data.meetDepText || '',\n" +
-  "    data.summaryText || ''\n" +
+  "    data.summaryText || '',\n" +
+  "    data.id || ''\n" +
   "  ]);\n" +
   "  formatReportRow(sheet, sheet.getLastRow());\n" +
-  "  return ContentService.createTextOutput(JSON.stringify({ok: true}))\n" +
-  "    .setMimeType(ContentService.MimeType.JSON);\n" +
+  "  return jsonOut_({ok: true});\n" +
   "}\n" +
   "\n" +
   "function doGet(e) {\n" +
-  "  return ContentService.createTextOutput(JSON.stringify({ok: true, message: 'Report-time backend is running'}))\n" +
+  "  return jsonOut_({ok: true, message: 'Report-time backend is running'});\n" +
+  "}\n" +
+  "\n" +
+  "function jsonOut_(obj) {\n" +
+  "  return ContentService.createTextOutput(JSON.stringify(obj))\n" +
   "    .setMimeType(ContentService.MimeType.JSON);\n" +
   "}\n" +
   "\n" +
-  "// ---------- Formatting: bold header, sensible widths, color-coded results ----------\n" +
-  "var REPORT_COLS = 14;\n" +
+  "function getOrCreateReportSheet_() {\n" +
+  "  var ss = SpreadsheetApp.getActiveSpreadsheet();\n" +
+  "  var sheet = ss.getSheetByName(SHEET_NAME);\n" +
+  "  if (!sheet) {\n" +
+  "    sheet = ss.insertSheet(SHEET_NAME);\n" +
+  "    sheet.appendRow(HEADER);\n" +
+  "    formatReportHeader(sheet);\n" +
+  "  }\n" +
+  "  return sheet;\n" +
+  "}\n" +
   "\n" +
+  "// Finds the row whose \"รหัส\" (last column) matches id and deletes it.\n" +
+  "// Returns true if a row was found and deleted, false otherwise.\n" +
+  "function deleteReportRow_(sheet, id) {\n" +
+  "  if (!id) return false;\n" +
+  "  var lastRow = sheet.getLastRow();\n" +
+  "  if (lastRow < 2) return false;\n" +
+  "  var ids = sheet.getRange(2, REPORT_COLS, lastRow - 1, 1).getValues();\n" +
+  "  for (var i = 0; i < ids.length; i++) {\n" +
+  "    if (String(ids[i][0]) === String(id)) {\n" +
+  "      sheet.deleteRow(i + 2); // +2: array is 0-based and starts at row 2\n" +
+  "      return true;\n" +
+  "    }\n" +
+  "  }\n" +
+  "  return false;\n" +
+  "}\n" +
+  "\n" +
+  "// ---------- Formatting: bold header, sensible widths, color-coded results ----------\n" +
   "function formatReportHeader(sheet) {\n" +
   "  var headerRange = sheet.getRange(1, 1, 1, REPORT_COLS);\n" +
   "  headerRange.setFontWeight('bold')\n" +
@@ -3181,8 +3279,11 @@ const APPS_SCRIPT_SOURCE = "function doPost(e) {\n" +
   "    .setWrap(true);\n" +
   "  sheet.setFrozenRows(1);\n" +
   "  sheet.setRowHeight(1, 34);\n" +
-  "  var widths = [95, 130, 130, 60, 65, 95, 110, 95, 90, 70, 95, 70, 95, 340];\n" +
+  "  var widths = [95, 130, 130, 60, 65, 95, 110, 95, 90, 70, 95, 70, 95, 340, 40];\n" +
   "  for (var i = 0; i < widths.length; i++) sheet.setColumnWidth(i + 1, widths[i]);\n" +
+  "  // \"รหัส\" is an internal id used to find/delete a row from the app — not\n" +
+  "  // meant to be read or edited by hand, so keep it out of the way.\n" +
+  "  sheet.hideColumns(REPORT_COLS);\n" +
   "}\n" +
   "\n" +
   "function formatReportRow(sheet, row) {\n" +
@@ -3190,7 +3291,7 @@ const APPS_SCRIPT_SOURCE = "function doPost(e) {\n" +
   "  range.setBorder(true, true, true, true, true, true, '#e3d9c8', SpreadsheetApp.BorderStyle.SOLID);\n" +
   "  range.setVerticalAlignment('top');\n" +
   "  range.setBackground(row % 2 === 0 ? '#faf6ef' : '#ffffff');\n" +
-  "  sheet.getRange(row, REPORT_COLS).setWrap(true); // สรุปรายงาน\n" +
+  "  sheet.getRange(row, 14).setWrap(true); // สรุปรายงาน\n" +
   "  colorizeResult(sheet.getRange(row, 6));  // ผลถึง\n" +
   "  colorizeResult(sheet.getRange(row, 8));  // ผลออก\n" +
   "  colorizeResult(sheet.getRange(row, 11)); // ผลหลีกถึง\n" +
@@ -3209,9 +3310,14 @@ const APPS_SCRIPT_SOURCE = "function doPost(e) {\n" +
   "// Run this once from the Apps Script editor (select it in the function\n" +
   "// dropdown at the top, then click ▶ Run) to format rows that were added\n" +
   "// before this formatting code was in place — new rows format themselves.\n" +
+  "// Also backfills a \"รหัส\" header + hides that column if this sheet predates\n" +
+  "// the delete feature.\n" +
   "function formatExistingReportSheet() {\n" +
-  "  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('รายงาน');\n" +
+  "  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);\n" +
   "  if (!sheet) return;\n" +
+  "  if (sheet.getLastColumn() < REPORT_COLS) {\n" +
+  "    sheet.getRange(1, REPORT_COLS).setValue('รหัส');\n" +
+  "  }\n" +
   "  formatReportHeader(sheet);\n" +
   "  var lastRow = sheet.getLastRow();\n" +
   "  for (var r = 2; r <= lastRow; r++) formatReportRow(sheet, r);\n" +
@@ -3232,7 +3338,7 @@ document.getElementById('copyAppsScriptBtn').addEventListener('click', async ()=
 // user's Apps Script Web App. Local save (storageSet, in the saveBtn handler)
 // is always the reliable copy — this is an additional sync layer, silently
 // skipped if no Apps Script URL is configured, and never blocks local save.
-async function postReportToSheet(report){
+async function postReportToSheet(report, id){
   if(!APPS_SCRIPT_URL){
     console.log('[sheet report] no Apps Script URL configured — skipped (set it in ตั้งค่า)');
     return;
@@ -3241,6 +3347,7 @@ async function postReportToSheet(report){
   const pad = n => String(n).padStart(2,'0');
   const isoDate = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
   const payload = {
+    id: id || '',
     date: isoDate,
     createdAtDisplay: report.createdAtDisplay || '',
     station: report.stationShort || report.station || '',
@@ -3277,6 +3384,39 @@ async function postReportToSheet(report){
     // reached Apps Script — the message below is exactly what to screenshot.
     console.warn('[sheet report] POST failed before reaching Apps Script:', e.message || e, e);
     showToast('⚠️ ส่งเข้า Google Sheet ไม่สำเร็จ — บันทึกในเครื่องแล้ว ดูรายละเอียดใน Console');
+  }
+}
+
+// Deletes one row from the Sheet's "รายงาน" tab by its "รหัส" (id) column.
+// Returns true only when the Apps Script confirms it actually found and
+// removed a row — a row saved before the id column existed can't be
+// targeted this way and has to be deleted by hand in the Sheet.
+async function deleteReportFromSheet(id){
+  if(!APPS_SCRIPT_URL){
+    showToast('⚠️ ยังไม่ได้ตั้งค่า Google Sheet ในแท็บตั้งค่า ลบไม่ได้');
+    return false;
+  }
+  if(!id){
+    showToast('⚠️ รายการนี้ไม่มีรหัส (บันทึกไว้ก่อนมีระบบลบ) ลบจากแอปไม่ได้ ต้องลบในชีตเอง');
+    return false;
+  }
+  try{
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify({action: 'delete', id})
+    });
+    const json = await res.json().catch(()=>null);
+    if(res.ok && json && json.deleted){
+      return true;
+    }
+    console.warn('[sheet report] delete did not remove a row:', res.status, json);
+    showToast('⚠️ ไม่พบรายการนี้ใน Google Sheet (อาจถูกลบไปแล้ว)');
+    return false;
+  }catch(e){
+    console.warn('[sheet report] delete failed:', e.message || e, e);
+    showToast('⚠️ ลบไม่สำเร็จ — ลองใหม่อีกครั้ง');
+    return false;
   }
 }
 
