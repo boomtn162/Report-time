@@ -166,7 +166,7 @@ select{font:inherit;color:inherit}
   </div>
   <label id="search" class="card">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7b79" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-    <input id="q" placeholder="ค้นหาเลขคิว · เลขตั๋ว · เลขพัสดุ · เลขขบวน (ไม่ต้องใส่ 0 นำหน้า)" autocomplete="off">
+    <input id="q" placeholder="ค้นหาเลขคิว · เลขตั๋ว · เลขสินค้า · เลขขบวน (ไม่ต้องใส่ 0 นำหน้า)" autocomplete="off">
     <span class="hint" id="qhint"></span>
   </label>
   <button id="btnPanels" class="card">☰</button>
@@ -221,8 +221,8 @@ select{font:inherit;color:inherit}
 
 <div id="right">
   <div class="card"><h3>จุดบริการ <small id="svcNote"></small></h3><div id="svcList"></div></div>
-  <div class="card"><h3>ขบวนรถ <small>ตารางตัวอย่าง</small></h3><div id="trList"></div></div>
-  <div class="card"><h3>ตั๋ว & พัสดุวันนี้ <small id="sumT"></small></h3><div id="sum"></div></div>
+  <div class="card"><h3>ขบวนรถ <small>ตามตารางเดินรถ</small></h3><div id="trList"></div></div>
+  <div class="card"><h3>ตั๋ว & สินค้าวันนี้ <small id="sumT"></small></h3><div id="sum"></div></div>
 </div>
 
 <div id="detail" class="card"></div>
@@ -235,8 +235,8 @@ select{font:inherit;color:inherit}
    แก้ชื่อสถานี / ตารางเดินรถ / จำนวนช่องบริการ ได้ที่ STATION, TIMETABLE, ZONES
    ===================================================================== */
 
-const STATION = { name:'สถานีรถไฟ', sub:'อาคารผู้โดยสาร · งานบริการ', here:'สถานีนี้' };
-const OPEN = 4*3600, CLOSE = 24*3600 - 60;
+const STATION = { name:'สถานีรถไฟตันหยงมัส', sub:'ยม. · อ.ระแงะ จ.นราธิวาส · สายใต้', here:'ตันหยงมัส' };
+const OPEN = 5*3600, CLOSE = 20*3600;
 
 /* ---------------- helpers ---------------- */
 const $ = s => document.querySelector(s);
@@ -273,24 +273,19 @@ class Heap{
     return top; }
 }
 
-/* ---------------- ผังสถานี (หน่วยเมตร: x ไปทางขวา, y ไปทางใต้/ลานหน้าสถานี) ---------------- */
-// จุดเดินทาง (กราฟทางเดิน)
+/* ---------------- ผังสถานีตันหยงมัส (หน่วยเมตร: x ไปตามแนวราง, y ไปทางลานหน้าสถานี) ----------------
+   ชานชาลา/รางอยู่ด้านบน (y น้อย) · อาคารสถานียาวขนานราง · ลานจอดรถและวงเวียนอยู่ด้านหน้า (y มาก)
+   ซ้ายสุดของอาคารคือห้องรับ-ส่งสินค้า ถัดมาคือห้องนายสถานี/ช่องจำหน่ายตั๋ว แล้วจึงเป็นห้องพักผู้โดยสาร */
 const N = {
-  street:[34,51], door:[34,44.6], lobby:[34,38.5], cor_lob:[34,32.5],
-  cor_book:[7.5,32.5], book_in:[7.5,35.4], cor_tick:[21,32.5], tick_in:[21,35.4],
-  hall_s:[29.5,32.5], gate_q:[29.5,25.2],
-  cor_kio:[41,32.5], kio_in:[41,35.4], cor_inf:[49,32.5], inf_in:[49,35.4],
-  cor_e:[51.5,32.5], e2:[51.5,28], pick_in:[54.8,28], e3:[51.5,23.2], exit_out:[46,23.2],
-  gate_out:[29.5,16.6], p1_w:[5,16.6], p1_e:[46,16.6], p1_x:[66,16.6],
-  p2_w:[5,9.2], p2_x:[66,9.2],
-  street_p:[63,51], parcel_door:[63,44.6], parcel_in:[63,42.2],
+  street:[41,50], door:[41,30.8], hall_c:[41,26.2], tick_in:[34.6,24.5], hall_n:[41,19],
+  p1_w:[9,16.6], p1_m:[41,16.6], p1_c:[46,16.6], p1_e:[68,16.6],
+  p2_w:[9,9.2], p2_c:[46,9.2], p2_e:[68,9.2],
+  goods_out:[11,31], goods_in:[11,28.4],
 };
 const EDGES = [
-  ['street','door'],['door','lobby'],['lobby','cor_lob'],['cor_book','cor_tick'],['cor_tick','hall_s'],['hall_s','cor_lob'],
-  ['cor_lob','cor_kio'],['cor_kio','cor_inf'],['cor_inf','cor_e'],['cor_book','book_in'],['cor_tick','tick_in'],
-  ['cor_kio','kio_in'],['cor_inf','inf_in'],['cor_e','e2'],['e2','pick_in'],['e2','e3'],['e3','exit_out'],['hall_s','gate_q'],
-  ['p1_w','gate_out'],['gate_out','p1_e'],['p1_e','p1_x'],['p1_w','p2_w'],['p1_x','p2_x'],['p2_w','p2_x'],
-  ['street','street_p'],['street_p','parcel_door'],['parcel_door','parcel_in'],
+  ['street','door'],['door','hall_c'],['hall_c','tick_in'],['hall_c','hall_n'],['hall_n','p1_m'],
+  ['p1_w','p1_m'],['p1_m','p1_c'],['p1_c','p1_e'],['p1_w','p2_w'],['p1_c','p2_c'],['p2_w','p2_c'],['p2_c','p2_e'],
+  ['street','goods_out'],['goods_out','goods_in'],
 ];
 const ADJ = {}; for(const k in N) ADJ[k] = [];
 for(const [a,b] of EDGES){ const d = dist(N[a],N[b]); ADJ[a].push([b,d]); ADJ[b].push([a,d]); }
@@ -307,101 +302,69 @@ function route(a,b){
 }
 
 const H_OPEN = (a,b) => t => (t >= a*3600 && t < b*3600);
-// จุดบริการ: srv = ตำแหน่งที่ลูกค้ายืนรับบริการ, desk/staff = ระยะ y ของโต๊ะ/เจ้าหน้าที่
+// จุดบริการ: srv = จุดที่ลูกค้ายืนรับบริการ, desks = เคาน์เตอร์ [x0,y0,x1,y1], staff = ตำแหน่งเจ้าหน้าที่
 const ZONES = {
-  booking:{ name:'จองตั๋วล่วงหน้า', prefix:'B', rect:[1,34,13,44], floor:'#efe9fa', entry:'book_in',
-    srv:[[4,41.6],[7.5,41.6],[11,41.6]], desk:42.4, staff:43.1, queue:{x0:2.6,x1:11.6,yN:39.6,yF:35.8}, cap:16,
-    dur:[150,360], open:8*3600, nAt:t=>3, staffOn:H_OPEN(8,18),
-    wait:'รอจองตั๋ว', now:'กำลังจองตั๋ว', label:[7,38.5] },
-  ticket:{ name:'ห้องจำหน่ายตั๋ว', prefix:'T', rect:[13,34,29,44], floor:'#e3f2ef', entry:'tick_in',
-    srv:[[15,41.6],[18,41.6],[21,41.6],[24,41.6],[27,41.6]], desk:42.4, staff:43.1, queue:{x0:14.4,x1:27.6,yN:39.6,yF:35.8}, cap:30,
-    dur:[55,170], open:4.5*3600, nAt:t=>(t<6*3600||t>=20*3600)?2:5, staffOn:H_OPEN(4.5,23),
-    wait:'รอซื้อตั๋ว', now:'กำลังซื้อตั๋ว', label:[21,38.5] },
-  kiosk:{ name:'ตู้จำหน่ายตั๋วอัตโนมัติ', prefix:'', rect:[37,34,45,44], floor:'#e7f0fa', entry:'kio_in',
-    srv:[[38.5,41.6],[40.5,41.6],[42.5,41.6],[44,41.6]], desk:42.5, queue:{x0:38,x1:44,yN:39.6,yF:35.8}, cap:14,
-    dur:[40,110], open:4*3600, nAt:t=>4, kiosk:true,
-    wait:'รอใช้ตู้ตั๋ว', now:'ซื้อตั๋วที่ตู้', label:[41,38.5] },
-  info:{ name:'ประชาสัมพันธ์', prefix:'I', rect:[45,34,53,44], floor:'#f4f1e6', entry:'inf_in',
-    srv:[[47.5,41.6],[50.5,41.6]], desk:42.4, staff:43.1, queue:{x0:46,x1:52,yN:39.6,yF:36}, cap:10,
-    dur:[30,160], open:6*3600, nAt:t=>(t<9*3600||t>=18*3600)?1:2, staffOn:H_OPEN(6,21),
-    wait:'รอสอบถาม', now:'กำลังสอบถาม', label:[49,38.5] },
-  parcel:{ name:'รับฝาก-ส่งพัสดุ', prefix:'P', rect:[53,31.5,73,44], floor:'#fbefe1', entry:'parcel_in',
-    srv:[[59,34.4],[66,34.4]], desk:33.6, staff:32.9, queue:{x0:55,x1:71,yN:36,yF:41}, cap:20,
-    dur:[160,420], open:7*3600, nAt:t=>2, staffOn:H_OPEN(7,19),
-    wait:'รอส่งพัสดุ', now:'ชั่ง/ชำระค่าส่ง', label:[63,38.5] },
-  pickup:{ name:'รับพัสดุ', prefix:'R', rect:[53,25,73,31.5], floor:'#fdf6dd', entry:'pick_in',
-    srv:[[59,27.2],[65,27.2]], desk:26.4, staff:25.8, queue:{x0:55.5,x1:70,yN:28.6,yF:30.8}, cap:12,
-    dur:[80,230], open:7.5*3600, nAt:t=>(t>=10*3600&&t<16*3600)?2:1, staffOn:H_OPEN(7.5,20),
-    wait:'รอรับพัสดุ', now:'กำลังรับพัสดุ', label:[63,29.2] },
-  gate:{ name:'ตรวจตั๋วขาออก', prefix:'', rect:[20,18,40,22], floor:'#e6efed', entry:'gate_q',
-    srv:[[22.5,20],[27.5,20],[32.5,20],[37.5,20]], queue:{x0:21,x1:38.5,yN:23.1,yF:24.6}, cap:44,
-    dur:[4,11], open:4.5*3600, nAt:t=>4, gate:true,
-    wait:'รอตรวจตั๋ว', now:'ตรวจตั๋ว', label:[30,21] },
-  exitgate:{ name:'ทางออกผู้โดยสารขาเข้า', prefix:'', rect:[40,18,50,22], floor:'#e6efed', entry:'p1_e',
-    srv:[[43.5,20],[48,20]], queue:{x0:41.5,x1:49.5,yN:17.4,yF:15.6}, cap:30,
-    dur:[3,7], open:4*3600, nAt:t=>2, gate:true,
-    wait:'รอออกจากชานชาลา', now:'ตรวจตั๋วขาออก', label:[45.5,21] },
+  ticket:{ name:'ช่องจำหน่ายตั๋ว (2 ช่อง)', prefix:'T', rect:[30,19.4,37.4,29.6], floor:'#e3f2ef', entry:'tick_in',
+    srv:[[31.4,22.6],[31.4,26.4]], desks:[[30.15,21.8,30.8,23.4],[30.15,25.6,30.8,27.2]], staff:[[29.1,22.6],[29.1,26.4]],
+    queue:{ v:true, y0:20.4, y1:28.8, xN:32.6, xF:36.8 }, cap:24,
+    dur:[50,150], open:5.5*3600, nAt:t=>(t>=6.5*3600&&t<17*3600)?2:1, staffOn:H_OPEN(5.5,18),
+    wait:'รอซื้อตั๋ว', now:'กำลังซื้อตั๋ว', label:[33.8,21] },
+  goods:{ name:'ห้องรับ-ส่งสินค้า', prefix:'G', rect:[4,25.2,18,30], floor:'#fbefe1', entry:'goods_in',
+    srv:[[11,26.4]], desks:[[9.6,25.25,12.4,25.85]], staff:[[11,24.6],[15.6,21.4]],
+    queue:{ x0:5.2, x1:16.8, yN:27.6, yF:29.5 }, cap:14,
+    dur:[140,320], open:7.5*3600, nAt:t=>1, staffOn:H_OPEN(7.5,17),
+    wait:'รอรับ-ส่งสินค้า', now:'ชั่ง/ชำระค่าส่ง', label:[11,28] },
 };
-const SVC_ORDER = ['booking','ticket','kiosk','info','gate','exitgate','parcel','pickup'];
+const SVC_ORDER = ['ticket','goods'];
 const AREAS = { // พื้นที่อื่น ๆ ที่แสดงจำนวนคน
-  hall:{ name:'ห้องพักผู้โดยสาร', rect:[1,22,50,31], cap:190, label:[14,27.2] },
-  plat1:{ name:'ชานชาลา 1', rect:[0,14.8,73,18], cap:220, label:[12,16.4] },
-  plat2:{ name:'ชานชาลา 2', rect:[0,7.2,73,11.2], cap:220, label:[12,9.2] },
-  wh:{ name:'คลังสินค้า', rect:[53,18,73,25], cap:140, label:[59,21.5], parcels:true },
+  hall:{ name:'ห้องพักผู้โดยสาร', rect:[37.4,18,52,30], cap:110, label:[46.5,23.2] },
+  plat1:{ name:'ชานชาลา 1', rect:[0,14.8,74,18], cap:140, label:[24,16.4] },
+  plat2:{ name:'ชานชาลา 2', rect:[0,7.2,74,11.2], cap:140, label:[24,9.2] },
+  store:{ name:'สินค้าในห้องเก็บ', rect:[4,18,18,25.2], cap:70, label:[11,21.2], parcels:true },
 };
+const ROOMS = [ // ห้องที่ไม่มีคิวบริการ (แสดงชื่ออย่างเดียว)
+  { name:'ห้องนายสถานี', rect:[18,18,30,30], floor:'#eef1ef', label:[24,24], staff:[[21.5,21],[25.5,27.5]] },
+  { name:'ห้องควบคุมการเดินรถ', rect:[52,18,64,30], floor:'#eef1ef', label:[58,24], staff:[[57,21.5],[59.5,26]] },
+  { name:'ห้องน้ำ', rect:[64,18,70,30], floor:'#e9f0f5', label:[67,24] },
+];
 const TRACK_Y = {1:13, 2:5.4};          // แนวกึ่งกลางรางรถ
 const DOOR_Y  = {1:15.0, 2:7.4};        // จุดขึ้น-ลงรถบนชานชาลา
-const PLAT_Y  = {1:[15.5,17.7], 2:[7.8,10.8]};
-const X_FRONT = 68;                     // หัวขบวน (ตู้สัมภาระอยู่ใกล้คลังสินค้า)
+const PLAT_Y  = {1:[15.5,17.0], 2:[7.8,10.8]};
+const X0 = 4;                           // ท้ายขบวนฝั่งห้องสินค้า (ตู้สัมภาระอยู่ตรงนี้)
+const carX = (tr, i) => X0 + (i + .5) * 6.4;
+const locoI = tr => tr.dir > 0 ? tr.cars - 1 : 0;            // หัวรถจักรอยู่ด้านทิศทางที่วิ่ง
+const bagI = tr => tr.dir > 0 ? 0 : 1;                        // ตู้สัมภาระอยู่ฝั่งห้องสินค้า
+const paxCar = tr => { let i; do { i = ri(0, tr.cars-1); } while(i === locoI(tr) || (tr.T.bag && i === bagI(tr))); return i; };
 
-/* ---------------- ตารางเดินรถ (ตัวอย่าง สายใต้) ---------------- */
-const SOUTH = ['ราชบุรี','เพชรบุรี','หัวหิน','ประจวบคีรีขันธ์','ชุมพร','สุราษฎร์ธานี','ทุ่งสง','หาดใหญ่'];
-const stopsTo = dest => {
-  const map = { 'หัวหิน':3, 'ประจวบคีรีขันธ์':4, 'สุราษฎร์ธานี':6, 'หาดใหญ่':8 };
-  if(map[dest]) return SOUTH.slice(0, map[dest]);
-  if(dest === 'นครศรีธรรมราช' || dest === 'ตรัง') return [...SOUTH.slice(0,7), dest];
-  if(dest === 'ยะลา') return [...SOUTH, 'ปัตตานี', 'ยะลา'];
-  if(dest === 'สุไหงโก-ลก') return [...SOUTH, 'ปัตตานี', 'ยะลา', 'สุไหงโก-ลก'];
-  if(dest === 'ปาดังเบซาร์') return [...SOUTH, 'ปาดังเบซาร์'];
-  if(dest === 'ธนบุรี') return ['นครปฐม', 'ธนบุรี'];
-  return ['นครปฐม', 'กรุงเทพอภิวัฒน์'];
-};
+/* ---------------- ตารางเดินรถ สถานีตันหยงมัส (ยม.) ----------------
+   นำมาจาก SCHEDULE_DATA ของระบบรายงานเวลา (index.html)
+   [ขบวน, ประเภท, ต้นทาง, ปลายทาง, ถึง, ออก, ทิศทาง (1 = ไปสุไหงโกลก, -1 = ไปหาดใหญ่), สถานีถัดไป] */
 const TYPES = {
-  'ด่วนพิเศษ':{ cars:9, board:40, alight:30, price:[480,1050], cls:[1,2], color:'#2f6db5', bag:true },
-  'ด่วน':     { cars:10, board:48, alight:36, price:[290,720], cls:[2,3], color:'#c0453b', bag:true },
-  'เร็ว':      { cars:9, board:44, alight:34, price:[160,450], cls:[2,3], color:'#d9752b', bag:true },
-  'ธรรมดา':   { cars:6, board:36, alight:28, price:[18,95],  cls:[3],   color:'#8a6a4f', bag:false },
-  'ชานเมือง': { cars:5, board:62, alight:52, price:[10,45],  cls:[3],   color:'#1f9a83', bag:false },
+  'ด่วนพิเศษ':   { cars:9, board:18, alight:16, price:[90,1600], cls:[1,2], color:'#2f6db5', bag:true },
+  'เร็ว':        { cars:8, board:20, alight:18, price:[30,900],  cls:[2,3], color:'#d9752b', bag:true },
+  'ท้องถิ่น':    { cars:4, board:26, alight:24, price:[5,60],    cls:[3],   color:'#8a6a4f', bag:true },
+  'พิเศษสินค้า': { cars:12, board:0, alight:0,  price:[0,0],     cls:[],    color:'#7a5a3a', bag:false, freight:true },
 };
-// kind: through = ผ่าน, origin = ต้นทางที่สถานีนี้, terminal = ปลายทางที่สถานีนี้
 const TIMETABLE = [
-  ['32','ด่วนพิเศษ','หาดใหญ่','กรุงเทพอภิวัฒน์','05:20','05:23'],
-  ['351','ชานเมือง',STATION.here,'ธนบุรี',null,'05:30'],
-  ['172','เร็ว','สุไหงโก-ลก','กรุงเทพอภิวัฒน์','06:15','06:20'],
-  ['353','ชานเมือง',STATION.here,'ธนบุรี',null,'06:40'],
-  ['84','ด่วน','ตรัง','กรุงเทพอภิวัฒน์','06:50','06:55'],
-  ['38','ด่วนพิเศษ','สุไหงโก-ลก','กรุงเทพอภิวัฒน์','07:30','07:33'],
-  ['86','ด่วน','นครศรีธรรมราช','กรุงเทพอภิวัฒน์','07:55','08:00'],
-  ['255','ธรรมดา','ธนบุรี','ประจวบคีรีขันธ์','08:20','08:24'],
-  ['43','ด่วนพิเศษ','กรุงเทพอภิวัฒน์','สุราษฎร์ธานี','08:55','08:58'],
-  ['352','ชานเมือง','ธนบุรี',STATION.here,'09:40',null],
-  ['170','เร็ว','ยะลา','กรุงเทพอภิวัฒน์','10:05','10:10'],
-  ['261','ธรรมดา','กรุงเทพอภิวัฒน์','หัวหิน','10:30','10:34'],
-  ['354','ชานเมือง','ธนบุรี',STATION.here,'12:30',null],
-  ['256','ธรรมดา','ประจวบคีรีขันธ์','ธนบุรี','13:05','13:10'],
-  ['171','เร็ว','กรุงเทพอภิวัฒน์','สุไหงโก-ลก','14:10','14:15'],
-  ['45','ด่วนพิเศษ','กรุงเทพอภิวัฒน์','ปาดังเบซาร์','15:35','15:38'],
-  ['262','ธรรมดา','หัวหิน','กรุงเทพอภิวัฒน์','16:05','16:10'],
-  ['31','ด่วนพิเศษ','กรุงเทพอภิวัฒน์','หาดใหญ่','16:20','16:23'],
-  ['37','ด่วนพิเศษ','กรุงเทพอภิวัฒน์','สุไหงโก-ลก','16:55','16:58'],
-  ['355','ชานเมือง',STATION.here,'ธนบุรี',null,'17:20'],
-  ['169','เร็ว','กรุงเทพอภิวัฒน์','ยะลา','18:05','18:10'],
-  ['83','ด่วน','กรุงเทพอภิวัฒน์','ตรัง','18:40','18:45'],
-  ['356','ชานเมือง','ธนบุรี',STATION.here,'19:30',null],
-  ['85','ด่วน','กรุงเทพอภิวัฒน์','นครศรีธรรมราช','19:55','20:00'],
-  ['44','ด่วนพิเศษ','สุราษฎร์ธานี','กรุงเทพอภิวัฒน์','20:50','20:53'],
+  ["448","ท้องถิ่น","สุไหงโกลก","ชุมทางหาดใหญ่","07:16","07:17",-1,["กะแด๊ะ","มะรือโบ","ลาโละ","บ้านสโลว์บูกิตยือแร","รือเสาะ","บาลอ","รามัน","บ้านป่าแฝด","ไม้แก่น","ยะลา","ตาเซะ","คลองทราย","ป่าไร่","วัดช้างให้","นาประดู่","ปัตตานี","บ้านนิคม","ตาแปด","เทพา","เกาะสะบ้า","ท่าแมงลัก","จะนะ","วัดควนมีด","นาม่วง","ชุมทางหาดใหญ่"]],
+  ["456","ท้องถิ่น","สุไหงโกลก","ชุมทางหาดใหญ่","07:16","07:17",-1,["กะแด๊ะ","มะรือโบ","ลาโละ","บ้านสโลว์บูกิตยือแร","รือเสาะ","บาลอ","รามัน","บ้านป่าแฝด","ไม้แก่น","ยะลา","ตาเซะ","คลองทราย","ป่าไร่","วัดช้างให้","นาประดู่","ปัตตานี","บ้านนิคม","ตาแปด","เทพา","เกาะสะบ้า","ท่าแมงลัก","จะนะ","วัดควนมีด","นาม่วง","ชุมทางหาดใหญ่"]],
+  ["453","ท้องถิ่น","ยะลา","สุไหงโกลก","07:42","07:43",1,["ป่าไผ่","เจาะไอร้อง","บูกิต","ไอสระเตีย","โต๊ะเด็ง","สุไหงปาดี","โคกสยา","สุไหงโกลก"]],
+  ["171","เร็ว","กรุงเทพอภิวัฒน์","สุไหงโกลก","09:24","09:25",1,["ป่าไผ่","เจาะไอร้อง","บูกิต","โต๊ะเด็ง","สุไหงปาดี","สุไหงโกลก"]],
+  ["452","ท้องถิ่น","สุไหงโกลก","ชุมทางหาดใหญ่","09:51","09:57",-1,["กะแด๊ะ","มะรือโบ","ลาโละ","บ้านสโลว์บูกิตยือแร","รือเสาะ","บาลอ","รามัน","บ้านป่าแฝด","ไม้แก่น","ยะลา","ตาเซะ","คลองทราย","ป่าไร่","วัดช้างให้","นาประดู่","ปัตตานี","บ้านนิคม","ตาแปด","เทพา","เกาะสะบ้า","ท่าแมงลัก","จะนะ","วัดควนมีด","นาม่วง","ชุมทางหาดใหญ่"]],
+  ["37","ด่วนพิเศษ","กรุงเทพอภิวัฒน์","สุไหงโกลก","09:52","09:55",1,["ป่าไผ่","เจาะไอร้อง","บูกิต","โต๊ะเด็ง","สุไหงปาดี","สุไหงโกลก"]],
+  ["463","ท้องถิ่น","ชุมทางหาดใหญ่","สุไหงโกลก","11:19","11:20",1,["ป่าไผ่","เจาะไอร้อง","บูกิต","ไอสระเตีย","โต๊ะเด็ง","สุไหงปาดี","สุไหงโกลก"]],
+  ["169","เร็ว","กรุงเทพอภิวัฒน์","โคกสยา","11:20",null,1,["สุไหงปาดี","โคกสยา"]],
+  ["985","พิเศษสินค้า","ชุมทางหาดใหญ่","สุไหงโกลก","11:35","11:40",1,["ป่าไผ่","เจาะไอร้อง","บูกิต","โต๊ะเด็ง","สุไหงปาดี","สุไหงโกลก"]],
+  ["172","เร็ว","สุไหงโกลก","กรุงเทพอภิวัฒน์","12:51","12:52",-1,["มะรือโบ","ลาโละ","บ้านสโลว์บูกิตยือแร","รือเสาะ","บาลอ","ยะลา","ตาเซะ","คลองทราย","วัดช้างให้","นาประดู่","ปัตตานี","ตาแปด","เทพา","เกาะสะบ้า","ท่าแมงลัก","จะนะ","ชุมทางหาดใหญ่","กรุงเทพอภิวัฒน์"]],
+  ["464","ท้องถิ่น","เจาะไอร้อง","ชุมทางหาดใหญ่","13:30","13:35",-1,["มะรือโบ","ลาโละ","บ้านสโลว์บูกิตยือแร","รือเสาะ","บาลอ","รามัน","ยะลา","ตาเซะ","คลองทราย","ป่าไร่","วัดช้างให้","นาประดู่","ปัตตานี","บ้านนิคม","ตาแปด","เทพา","เกาะสะบ้า","ท่าแมงลัก","จะนะ","วัดควนมีด","ชุมทางหาดใหญ่"]],
+  ["451","ท้องถิ่น","ชุมทางหาดใหญ่","สุไหงโกลก","13:33","13:34",1,["ป่าไผ่","เจาะไอร้อง","บูกิต","ไอสระเตีย","โต๊ะเด็ง","สุไหงปาดี","โคกสยา","สุไหงโกลก"]],
+  ["986","พิเศษสินค้า","สุไหงโกลก","ชุมทางหาดใหญ่","14:18","14:21",-1,["ยะลา","ตาเซะ","บ้านนิคม","ตาแปด","เทพา","ชุมทางหาดใหญ่"]],
+  ["170","เร็ว","สุไหงปาดี","กรุงเทพอภิวัฒน์","14:21","14:24",-1,["มะรือโบ","ลาโละ","บ้านสโลว์บูกิตยือแร","รือเสาะ","บาลอ","รามัน","ยะลา","ตาเซะ","คลองทราย","ตาแปด","เทพา","จะนะ","ชุมทางหาดใหญ่","กรุงเทพอภิวัฒน์"]],
+  ["38","ด่วนพิเศษ","สุไหงโกลก","กรุงเทพอภิวัฒน์","14:54","14:56",-1,["ยะลา","ตาเซะ","คลองทราย","วัดช้างให้","นาประดู่","ปัตตานี","บ้านนิคม","ตาแปด","เทพา","เกาะสะบ้า","ท่าแมงลัก","จะนะ","วัดควนมีด","ชุมทางหาดใหญ่","กรุงเทพอภิวัฒน์"]],
+  ["454","ท้องถิ่น","สุไหงโกลก","ชุมทางหาดใหญ่","16:18","16:19",-1,["กะแด๊ะ","มะรือโบ","ลาโละ","บ้านสโลว์บูกิตยือแร","รือเสาะ","บาลอ","รามัน","บ้านป่าแฝด","ไม้แก่น","ยะลา","นาประดู่","ปัตตานี","เทพา","เกาะสะบ้า","ท่าแมงลัก","จะนะ","ชุมทางหาดใหญ่"]],
+  ["447","ท้องถิ่น","ชุมทางหาดใหญ่","สุไหงโกลก","16:45","16:46",1,["ป่าไผ่","เจาะไอร้อง","บูกิต","ไอสระเตีย","โต๊ะเด็ง","สุไหงปาดี","โคกสยา","สุไหงโกลก"]],
 ];
-const PARCEL_DESTS = [...new Set(TIMETABLE.filter(r => r[3] !== STATION.here).flatMap(r => stopsTo(r[3])))];
+const PARCEL_DESTS = [...new Set(TIMETABLE.filter(r => TYPES[r[1]].bag).flatMap(r => r[7]))];
 
 /* ---------------- สร้างข้อมูลจำลองของวัน ---------------- */
 let sim = null;
@@ -412,53 +375,52 @@ function buildDay(date){
   const dow = date.getDay();
   const dayF = (dow === 0 || dow === 5 || dow === 6) ? 1.25 : 1;
   const S = { date, trains:[], agents:[], parcels:[], ev:{}, waits:[], srv:{}, qn:{}, seq:{tk:0,snd:0,rcv:0} };
-  for(const k of ['saleCounter','saleKiosk','online','booking','parcelIn','parcelShip','parcelArr','parcelPick','board','alight']) S.ev[k] = [];
+  for(const k of ['saleCounter','online','booking','parcelIn','parcelShip','parcelArr','parcelPick','board','alight']) S.ev[k] = [];
   for(const k in ZONES) S.srv[k] = ZONES[k].srv.map(() => 0);
 
-  // ที่นั่งในห้องพัก
+  // ที่นั่ง: ห้องพักผู้โดยสาร + ม้านั่งบนชานชาลา 1
   S.seats = [];
-  for(const y of [25.7, 26.5, 28.5, 29.3]) for(let x = 2.6; x <= 49; x += 0.75){
-    if((x > 27.4 && x < 31.6) || (x > 13.4 && x < 15.4) || (x > 42.4 && x < 44.4)) continue;
-    S.seats.push({ x, y, back: (y === 25.7 || y === 28.5) ? -1 : 1, iv:[] });
+  for(const y of [20.6, 21.4, 23.8, 24.6, 27, 27.8]) for(let x = 38.3; x <= 51.4; x += 0.75){
+    if(x > 39.8 && x < 42.6) continue;
+    S.seats.push({ x, y, back: [20.6, 23.8, 27].includes(y) ? -1 : 1, area:'hall', iv:[] });
   }
-  // ช่องวางพัสดุในคลัง
+  for(let x = 26; x <= 66; x += 0.75){ if(Math.floor((x - 26) / 3.75) % 2) continue;
+    S.seats.push({ x, y:17.35, back:1, area:'plat1', iv:[] }); }
+  // ช่องวางสินค้าในห้องเก็บ
   S.slots = [];
-  for(let y = 19.2; y <= 24.2; y += 0.8) for(let x = 54.4; x <= 71.8; x += 0.8){
-    if(x > 63.6 && x < 68.4 && y < 21.8) continue;
+  for(let y = 18.9; y <= 24.4; y += 0.8) for(let x = 5; x <= 17.2; x += 0.8){
+    if(x > 9.8 && x < 12.4) continue;
     S.slots.push({ x, y, iv:[] });
   }
 
   // ขบวนรถ + ความล่าช้า
-  const trains = TIMETABLE.map(([no,type,from,to,arr,dep]) => {
+  const trains = TIMETABLE.map(([no,type,from,to,arr,dep,dir,stops]) => {
     const T = TYPES[type];
+    if(arr && !dep && stops.length) dep = hhmm(tm(arr) + 60);   // ข้อมูลไม่มีเวลาออก แต่ขบวนวิ่งต่อ
     const kind = !arr ? 'origin' : !dep ? 'terminal' : 'through';
     const u = R();
-    let delay = u < .58 ? 0 : u < .85 ? ri(1,10) : ri(11,40);
-    if(kind === 'origin') delay = R() < .85 ? 0 : ri(1,6);
-    const tr = { no, type, T, from, to, kind, dir: (to === 'กรุงเทพอภิวัฒน์' || to === 'ธนบุรี') ? -1 : 1,
-      arrS: arr ? tm(arr) : null, depS: dep ? tm(dep) : null };
+    let delay = u < .55 ? 0 : u < .85 ? ri(1,10) : ri(11,35);
+    const tr = { no, type, T, from, to, kind, dir, stops, arrS: arr ? tm(arr) : null, depS: dep ? tm(dep) : null };
     tr.delay = delay * 60;
-    if(kind === 'through'){ tr.arrA = tr.arrS + tr.delay; tr.depA = tr.depS + tr.delay; }
-    else if(kind === 'origin'){ tr.arrA = tr.depS - 35*60; tr.depA = tr.depS + tr.delay; }
+    if(kind === 'through'){ tr.arrA = tr.arrS + tr.delay; tr.depA = Math.max(tr.depS + tr.delay, tr.arrA + 60); }
+    else if(kind === 'origin'){ tr.arrA = tr.depS - 30*60; tr.depA = tr.depS + tr.delay; }
     else { tr.arrA = tr.arrS + tr.delay; tr.depA = tr.arrA + 12*60; }
-    tr.cars = T.cars + (R() < .3 ? 1 : 0) - (R() < .2 ? 1 : 0);
+    tr.cars = T.cars + (T.freight ? ri(-2, 2) : (R() < .3 ? 1 : 0) - (R() < .2 ? 1 : 0));
     tr.len = tr.cars * 6.4;
-    tr.stops = kind === 'terminal' ? [] : stopsTo(to);
     tr.tShow = tr.arrA - 75; tr.tHide = tr.depA + 75;
     tr.boardList = []; tr.alightList = []; tr.pOut = []; tr.pIn = [];
     return tr;
   });
-  // จัดลงราง: เลือกรางที่ว่าง
+  // จัดลงราง: ขบวนโดยสารใช้รางที่ 1 (ติดอาคาร) ก่อน ขบวนสินค้า/สับหลีกใช้รางที่ 2
   const free = {1:-1e9, 2:-1e9};
   [...trains].sort((a,b) => a.arrA - b.arrA).forEach(tr => {
-    const pref = tr.dir > 0 ? [1,2] : [2,1];
+    const pref = tr.T.freight ? [2,1] : [1,2];
     let tk = pref.find(k => free[k] <= tr.tShow - 60);
     if(!tk) tk = free[1] <= free[2] ? 1 : 2;
     tr.track = tk; free[tk] = tr.tHide;
   });
   S.trains = trains;
 
-  const carX = (tr, i) => X_FRONT - (i + .5) * 6.4;  // i = 0 คือตู้หน้า (ตู้สัมภาระ)
   let aid = 0;
   const mkAgent = (type, t, o = {}) => {
     const a = Object.assign({ id: ++aid, type, t, tIn: t, tOut: CLOSE, v: rr(1.0, 1.45), pos:null, node:null,
@@ -469,80 +431,73 @@ function buildDay(date){
 
   // ---- ผู้โดยสารขาออก ----
   for(const tr of trains){
-    if(tr.kind === 'terminal') continue;
-    const timeF = (tr.depS >= 6*3600 && tr.depS <= 9*3600) || (tr.depS >= 16*3600 && tr.depS <= 19*3600) ? 1.2 : 0.9;
-    const n = Math.round(tr.T.board * dayF * timeF * rr(.75, 1.2));
+    if(tr.kind === 'terminal' || !tr.T.board) continue;
+    const n = Math.round(tr.T.board * dayF * rr(.7, 1.25));
     for(let i = 0; i < n; i++){
-      const u = R();
-      const ch = u < .42 ? 'online' : u < .80 ? 'counter' : 'kiosk';
-      let t0 = tr.depS - (12 + Math.pow(R(), 1.5) * 80) * 60;
+      const ch = R() < .25 ? 'online' : 'counter';
+      let t0 = tr.depS - (8 + Math.pow(R(), 1.5) * 60) * 60;
       if(t0 < OPEN + 60) t0 = OPEN + 60 + R()*600;
-      const carI = tr.T.bag ? ri(1, tr.cars-1) : ri(0, tr.cars-1);
-      const ag = mkAgent('dep', t0, { tr, ch, carI, cls: pick(tr.T.cls), seat: ri(1, 64),
-        price: Math.round(rr(tr.T.price[0], tr.T.price[1]) / 5) * 5 });
+      const carI = paxCar(tr);
+      const dest = pick(tr.stops);
+      const span = Math.max(1, tr.stops.length);
+      const f = (tr.stops.indexOf(dest) + 1) / span;
+      const ag = mkAgent('dep', t0, { tr, ch, carI, dest, cls: pick(tr.T.cls), seat: ri(1, 64),
+        price: Math.max(5, Math.round((tr.T.price[0] + (tr.T.price[1] - tr.T.price[0]) * f * rr(.85, 1)) / 5) * 5) });
       ag.stepDefs = ch === 'online'
-        ? ['เข้าสถานี','ห้องพักผู้โดยสาร','ตรวจตั๋ว','ชานชาลา','ขึ้นรถ']
-        : ['เข้าสถานี', ch === 'kiosk' ? 'ตู้ตั๋วอัตโนมัติ' : 'ซื้อตั๋ว','ห้องพักผู้โดยสาร','ตรวจตั๋ว','ชานชาลา','ขึ้นรถ'];
+        ? ['เข้าสถานี','ห้องพักผู้โดยสาร','ชานชาลา','ขึ้นรถ']
+        : ['เข้าสถานี','ซื้อตั๋ว','ห้องพักผู้โดยสาร','ชานชาลา','ขึ้นรถ'];
       const off = ch === 'online' ? 0 : 1;
-      ag.plan.push(['spawn', streetPt(34), 'street', 0], ['go','door']);
-      if(R() < .06) ag.plan.push(['go','inf_in'], ['svc','info']);
+      ag.plan.push(['spawn', streetPt(41), 'street', 0], ['go','door']);
       if(ch !== 'online'){
-        ag.plan.push(['go', ch === 'kiosk' ? 'kio_in' : 'tick_in'], ['svc', ch === 'kiosk' ? 'kiosk' : 'ticket', { sMark:1, onDone:(a,s,e) => {
+        ag.plan.push(['go','tick_in'], ['svc','ticket', { sMark:1, onDone:(a,s,e) => {
           a.ticketNo = 'TK' + pad(++S.seq.tk, 5); a.keys.push(a.ticketNo);
-          S.ev[a.ch === 'kiosk' ? 'saleKiosk' : 'saleCounter'].push([e, a.price]); } }]);
+          S.ev.saleCounter.push([e, a.price]); } }]);
       } else {
         ag.ticketNo = 'TK' + pad(900000 + ri(0, 99999), 6); ag.keys.push(ag.ticketNo);
       }
-      const callT = tr.kind === 'origin' ? tr.depS - 25*60 : tr.arrA - 6*60;
-      ag.plan.push(['go','hall_s'], ['sit', callT, 1+off], ['go','gate_q'],
-        ['svc','gate', { sMark:2+off, onDone:(a,s) => { if(a.ch === 'online') S.ev.online.push([s, a.price]); } }],
-        ['go','gate_out'], ['plat', 3+off], ['board', 4+off]);
+      const callT = tr.kind === 'origin' ? tr.depS - 20*60 : tr.arrA - 5*60;
+      ag.plan.push(['go','hall_c'], ['sit', callT, 1+off], ['plat', 2+off], ['board', 3+off]);
       tr.boardList.push(ag);
     }
   }
   // ---- ผู้โดยสารขาเข้า ----
   for(const tr of trains){
-    if(tr.kind === 'origin') continue;
-    const n = Math.round(tr.T.alight * dayF * rr(.7, 1.2) * (tr.kind === 'terminal' ? 1.4 : 1));
+    if(tr.kind === 'origin' || !tr.T.alight) continue;
+    const n = Math.round(tr.T.alight * dayF * rr(.7, 1.25));
     for(let i = 0; i < n; i++){
-      const carI = tr.T.bag ? ri(1, tr.cars-1) : ri(0, tr.cars-1);
-      const t0 = tr.arrA + 15 + R() * 110;
+      const carI = paxCar(tr);
+      const t0 = tr.arrA + 10 + R() * Math.min(100, Math.max(20, tr.depA - tr.arrA - 10));
       const p = [carX(tr, carI) + rr(-1.5, 1.5), DOOR_Y[tr.track]];
       const ag = mkAgent('arr', t0, { tr, carI });
-      ag.stepDefs = ['ลงจากรถ','ตรวจตั๋วขาออก','ออกจากสถานี'];
-      const node = tr.track === 1 ? (p[0] < 20 ? 'p1_w' : p[0] < 56 ? 'p1_e' : 'p1_x') : (p[0] < 36 ? 'p2_w' : 'p2_x');
-      ag.plan.push(['spawn', p, null, 0], ['pt', N[node], node], ['go','p1_e'], ['svc','exitgate', { sMark:1 }],
-        ['go','street'], ['leave', 2]);
+      ag.stepDefs = ['ลงจากรถ','ออกจากสถานี'];
+      ag.plan.push(['spawn', p, null, 0]);
+      if(tr.track === 2) ag.plan.push(['pt', N.p2_c, 'p2_c'], ['go','hall_n']);
+      else ag.plan.push(['pt', N.hall_n, 'hall_n']);
+      ag.plan.push(['go','street'], ['leave', 1]);
       tr.alightList.push(ag);
     }
   }
   // ช่วงเวลาที่คนเข้ามาใช้บริการ (มีช่วงพีคเช้า/บ่าย)
   const sampleT = (a, b) => { for(;;){ const t = rr(a, b); const h = t/3600;
-      const w = .35 + Math.exp(-((h-9.5)**2)/3) + .8*Math.exp(-((h-15.5)**2)/4);
+      const w = .35 + Math.exp(-((h-9.5)**2)/3) + .8*Math.exp(-((h-14)**2)/4);
       if(R()*1.4 < w) return t; } };
-  // ---- จองตั๋วล่วงหน้า ----
-  const nBook = Math.round(130 * dayF * rr(.85, 1.15));
+  // ---- จองตั๋วล่วงหน้า (ใช้ช่องจำหน่ายตั๋วเดียวกัน) ----
+  const pax = trains.filter(t => t.T.board && t.kind !== 'terminal');
+  const nBook = Math.round(18 * dayF * rr(.8, 1.2));
   for(let i = 0; i < nBook; i++){
-    const tr = pick(trains.filter(t => t.kind !== 'terminal'));
+    const tr = pick(pax.filter(t => t.type !== 'ท้องถิ่น'));
     const travel = new Date(date); travel.setDate(travel.getDate() + ri(1, 45));
-    const pax = R() < .6 ? 1 : ri(2, 4);
-    const ag = mkAgent('book', sampleT(8*3600, 17.75*3600), { tr, travel, pax, cls: pick(tr.T.cls),
-      price: pax * Math.round(rr(tr.T.price[0], tr.T.price[1]) / 5) * 5,
+    const n = R() < .6 ? 1 : ri(2, 4);
+    const ag = mkAgent('book', sampleT(7*3600, 16.5*3600), { tr, travel, pax:n, cls: pick(tr.T.cls), dest: tr.to,
+      price: n * Math.round(rr(tr.T.price[1]*.5, tr.T.price[1]) / 5) * 5,
       pnr: 'BK' + Array.from({length:6}, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[ri(0,31)]).join('') });
     ag.keys.push(ag.pnr);
     ag.stepDefs = ['เข้าสถานี','รับบัตรคิว','จองตั๋ว','เสร็จสิ้น'];
-    ag.plan.push(['spawn', streetPt(34), 'street', 0], ['go','book_in'],
-      ['svc','booking', { qMark:1, sMark:2, eMark:3, onDone:(a,s,e) => S.ev.booking.push([e, a.price]) }], ['go','street'], ['leave']);
-  }
-  // ---- ประชาสัมพันธ์ ----
-  const nInfo = Math.round(55 * dayF * rr(.8, 1.2));
-  for(let i = 0; i < nInfo; i++){
-    const ag = mkAgent('info', sampleT(6*3600, 20.5*3600));
-    ag.stepDefs = ['เข้าสถานี','รับบัตรคิว','ติดต่อสอบถาม','เสร็จสิ้น'];
-    ag.plan.push(['spawn', streetPt(34), 'street', 0], ['go','inf_in'], ['svc','info', { qMark:1, sMark:2, eMark:3 }], ['go','street'], ['leave']);
+    ag.plan.push(['spawn', streetPt(41), 'street', 0], ['go','tick_in'],
+      ['svc','ticket', { qMark:1, sMark:2, eMark:3, dur:2.4, onDone:(a,s,e) => S.ev.booking.push([e, a.price]) }], ['go','street'], ['leave']);
   }
 
-  // ---- พัสดุ ----
+  // ---- สินค้า / พัสดุ ----
   const slotFor = (t0, t1) => {
     const s0 = ri(0, S.slots.length-1);
     for(let k = 0; k < S.slots.length; k++){ const s = S.slots[(s0 + k) % S.slots.length];
@@ -550,44 +505,43 @@ function buildDay(date){
     return S.slots[s0];
   };
   const loadPath = (tr, slot) => {
-    const door = [carX(tr, 0) + rr(-1.4, 1.4), DOOR_Y[tr.track]];
-    const pts = [[slot.x, slot.y], [66, 22], [66, 18.4], [66, 16.2]];
-    if(tr.track === 2) pts.push([66, 10.2]);
+    const door = [carX(tr, bagI(tr)) + rr(-1.4, 1.4), DOOR_Y[tr.track]];
+    const pts = [[slot.x, slot.y], [11, 20.5], [11, 18.2], [11, 16.2]];
+    if(tr.track === 2) pts.push([9, 16.2], [9, 10.2]);
     pts.push(door); return pts;
   };
   const nextLoad = {};
-  const loadTime = tr => { // คิวขนพัสดุขึ้นตู้สัมภาระ
-    const base = tr.kind === 'origin' ? tr.arrA + 300 : tr.arrA + 40;
-    nextLoad[tr.no] = Math.max(nextLoad[tr.no] || base, base) + rr(6, 14);
+  const loadTime = tr => { // คิวขนสินค้าขึ้นตู้สัมภาระ (ขบวนจอดสั้น จึงขนต่อเนื่องทันทีที่รถจอด)
+    const base = tr.kind === 'origin' ? tr.arrA + 300 : tr.arrA + 15;
+    nextLoad[tr.no] = Math.max(nextLoad[tr.no] || base, base) + rr(4, 9);
     return nextLoad[tr.no];
   };
+  const bagTrains = trains.filter(t => t.T.bag);
   let pid = 0;
-  // ขาเข้า: พัสดุที่มากับขบวนรถ (และค้างรับจากเมื่อวาน)
+  // ขาเข้า: สินค้าที่มากับขบวนรถ (และค้างรับจากวันก่อน)
   const inbound = [];
-  for(let i = 0; i < 16; i++) inbound.push({ tr:null, tReady: OPEN, from: pick(PARCEL_DESTS), old:true });
-  for(const tr of trains){
-    if(tr.kind === 'origin' || !tr.T.bag) continue;
-    const n = ri(1, 7);
+  for(let i = 0; i < 8; i++) inbound.push({ tr:null, tReady: OPEN, from: pick(PARCEL_DESTS), old:true });
+  for(const tr of bagTrains){
+    if(tr.kind === 'origin') continue;
+    const n = ri(0, tr.type === 'ท้องถิ่น' ? 3 : 5);
     for(let i = 0; i < n; i++){
-      const tU = tr.arrA + 50 + i * 12;
-      inbound.push({ tr, tU, tReady: tU + 85, from: tr.from });
+      const tU = tr.arrA + 15 + i * 9;
+      inbound.push({ tr, tU, tReady: tU + 70, from: tr.from });
     }
   }
   for(const ib of inbound){
     const p = { id: ++pid, dir:'in', code: 'RCV' + pad(++S.seq.rcv, 4), from: ib.from, w: +rr(.5, 28).toFixed(1),
       tr: ib.tr, segs:[], stepT:[], fee: 0 };
-    p.stepDefs = ['ฝากส่งที่ต้นทาง','ถึงสถานี','เข้าคลัง · รอรับ','ผู้รับมารับแล้ว'];
-    const willPick = R() < .78;
-    let tCome = willPick ? ib.tReady + rr(40, 480) * 60 : Infinity;
-    if(ib.old) tCome = willPick ? sampleT(7.6*3600, 18*3600) : Infinity;
-    if(tCome > 19.5*3600) tCome = Infinity;
-    const tEndSlot = tCome === Infinity ? CLOSE : tCome + 3600; // ปลายช่วงจองช่องคลัง (ปรับจริงภายหลัง)
-    const slot = slotFor(ib.tReady, tEndSlot);
+    p.stepDefs = ['ฝากส่งที่ต้นทาง','ถึงสถานี','เข้าห้องเก็บ · รอรับ','ผู้รับมารับแล้ว'];
+    const willPick = R() < .8;
+    let tCome = willPick ? ib.tReady + rr(30, 360) * 60 : Infinity;
+    if(ib.old) tCome = willPick ? sampleT(7.6*3600, 16*3600) : Infinity;
+    if(tCome > 16.7*3600) tCome = Infinity;
+    const slot = slotFor(ib.tReady, tCome === Infinity ? CLOSE : tCome + 3600);
     p.slot = slot;
     if(ib.tr){
-      p.stepT[0] = ib.tr.arrA - rr(2, 9) * 3600; p.stepT[1] = ib.tr.arrA; p.stepT[2] = ib.tReady;
-      const pts = loadPath(ib.tr, slot).reverse();
-      p.segs.push({ k:'move', pts, t0: ib.tU, t1: ib.tReady });
+      p.stepT[0] = ib.tr.arrA - rr(1, 6) * 3600; p.stepT[1] = ib.tr.arrA; p.stepT[2] = ib.tReady;
+      p.segs.push({ k:'move', pts: loadPath(ib.tr, slot).reverse(), t0: ib.tU, t1: ib.tReady });
       S.ev.parcelArr.push([ib.tU, 0]); ib.tr.pIn.push(p);
     } else { p.stepT[0] = OPEN - rr(20, 40)*3600; p.stepT[1] = OPEN - rr(2, 12)*3600; p.stepT[2] = p.stepT[1] + 600; }
     p.segs.push({ k:'at', p:[slot.x, slot.y], z:0, t0: ib.tReady, t1: CLOSE + 1, slotSeg:true });
@@ -596,58 +550,59 @@ function buildDay(date){
     S.parcels.push(p);
     if(tCome < Infinity){
       const ag = mkAgent('pick', tCome, { parcels:[p] });
-      ag.stepDefs = ['เข้าสถานี','รับบัตรคิว','รับพัสดุ','เสร็จสิ้น'];
-      ag.plan.push(['spawn', streetPt(48), 'street', 0], ['go','pick_in'],
-        ['svc','pickup', { qMark:1, sMark:2, eMark:3, onStart:(a, s, e, srvI) => {
-          const z = ZONES.pickup, q = a.parcels[0]; const last = q.segs[q.segs.length-1];
-          last.t1 = s; const desk = [z.srv[srvI][0], z.desk];
-          q.segs.push({ k:'move', pts:[[q.slot.x, q.slot.y], [z.srv[srvI][0], 24.8], desk], t0:s, t1:s + Math.min(60, (e-s)*.5) });
-          q.segs.push({ k:'at', p:desk, z:1.0, t0:s + Math.min(60, (e-s)*.5), t1:e });
+      ag.stepDefs = ['เข้าสถานี','รับบัตรคิว','รับสินค้า','เสร็จสิ้น'];
+      ag.plan.push(['spawn', streetPt(14), 'street', 0], ['go','goods_in'],
+        ['svc','goods', { qMark:1, sMark:2, eMark:3, dur:.7, onStart:(a, s, e, srvI) => {
+          const z = ZONES.goods, q = a.parcels[0]; const last = q.segs[q.segs.length-1];
+          last.t1 = s; const desk = [z.srv[srvI][0], 25.55];
+          const tm1 = s + Math.min(50, (e-s)*.5);
+          q.segs.push({ k:'move', pts:[[q.slot.x, q.slot.y], [z.srv[srvI][0], 24.6], desk], t0:s, t1:tm1 });
+          q.segs.push({ k:'at', p:desk, z:1.0, t0:tm1, t1:e });
           q.stepT[3] = e; q.tOut = e; q.picker = a; a.carry.push([e, Infinity]);
           S.ev.parcelPick.push([e, 0]);
         } }], ['go','street'], ['leave']);
       p.picker = ag;
     }
   }
-  // ขาออก: ผู้มาฝากส่ง
-  const nSend = Math.round(85 * dayF * rr(.85, 1.2));
+  // ขาออก: ผู้มาฝากส่งสินค้า
+  const nSend = Math.round(28 * dayF * rr(.8, 1.2));
   for(let i = 0; i < nSend; i++){
-    const nP = R() < .7 ? 1 : ri(2, 3);
-    const ag = mkAgent('send', sampleT(7*3600, 18.5*3600), { parcels:[] , nP });
+    const nP = R() < .65 ? 1 : ri(2, 3);
+    const ag = mkAgent('send', sampleT(7.5*3600, 16.3*3600), { parcels:[], nP });
     ag.carry.push([ag.t, Infinity]);
     ag.stepDefs = ['เข้าสถานี','รับบัตรคิว','ชั่ง/ชำระค่าส่ง','เสร็จสิ้น'];
-    ag.plan.push(['spawn', streetPt(63), 'street_p', 0], ['go','parcel_in'],
-      ['svc','parcel', { qMark:1, sMark:2, eMark:3, dur: 1 + (nP-1)*.35, onDone:(a, s, e, srvI) => {
+    ag.plan.push(['spawn', streetPt(14), 'street', 0], ['go','goods_in'],
+      ['svc','goods', { qMark:1, sMark:2, eMark:3, dur: 1 + (nP-1)*.35, onDone:(a, s, e, srvI) => {
         a.carry[0][1] = e;
-        const z = ZONES.parcel;
         for(let j = 0; j < a.nP; j++){
           const dest = pick(PARCEL_DESTS), w = +rr(.3, 25).toFixed(1);
           const p = { id: ++pid, dir:'out', code:'SND' + pad(++S.seq.snd, 4), dest, w, fee: Math.round(30 + w*9 + rr(0,40)),
             sender:a, segs:[], stepT:[e], tIn:e };
-          p.stepDefs = ['รับฝาก','เข้าคลัง','ขนขึ้นรถ','ออกเดินทาง','ถึงปลายทาง (โดยประมาณ)'];
+          p.stepDefs = ['รับฝาก','เข้าห้องเก็บ','ขนขึ้นรถ','ออกเดินทาง','ถึงปลายทาง (โดยประมาณ)'];
           p.keys = [p.code];
-          const desk = [z.srv[srvI][0] + (j-1)*.5, z.desk];
-          const tMove = e + rr(4, 14)*60, tWh = tMove + 80;
-          const tr = trains.filter(t => t.kind !== 'terminal' && t.T.bag && t.stops.includes(dest) && t.arrA + 40 >= tWh + 600)
-                           .sort((x,y) => x.arrA - y.arrA)[0];
+          const desk = [11 + (j-1)*.5, 25.55];
+          const tMove = e + rr(2, 8)*60, tWh = tMove + 30;
+          const tr = bagTrains.filter(t => t.kind !== 'terminal' && t.stops.includes(dest) && t.arrA + 15 >= tWh + 600)
+                              .sort((x,y) => x.arrA - y.arrA)[0];
           let tLoad = tr ? loadTime(tr) : CLOSE + 1;
-          if(tr && tLoad + 90 > tr.depA - 30) tLoad = tr.depA - 130;
+          if(tr && tLoad + 60 > tr.depA - 10) tLoad = Math.max(tr.arrA + 5, tr.depA - 70);
           const slot = slotFor(tWh, tLoad);
           p.segs.push({ k:'at', p:desk, z:1.0, t0:e, t1:tMove });
-          p.segs.push({ k:'move', pts:[desk, [71, 34.4], [71, 24.2], [slot.x, slot.y]], t0:tMove, t1:tWh });
+          p.segs.push({ k:'move', pts:[desk, [slot.x, slot.y]], t0:tMove, t1:tWh });
           p.segs.push({ k:'at', p:[slot.x, slot.y], z:0, t0:tWh, t1:tLoad });
           p.stepT[1] = tWh;
           if(tr){
-            p.tr = tr; p.segs.push({ k:'move', pts: loadPath(tr, slot), t0:tLoad, t1:tLoad + 85 });
-            p.stepT[2] = tLoad; p.stepT[3] = tr.depA;
-            p.stepT[4] = tr.depA + (tr.stops.indexOf(dest) + 1) * rr(45, 70) * 60;
-            p.tOut = tLoad + 85; tr.pOut.push(p);
+            const tl1 = Math.min(tLoad + 60, tr.depA - 5);
+            p.tr = tr; p.segs.push({ k:'move', pts: loadPath(tr, slot), t0:tLoad, t1:tl1 });
+            p.stepT[2] = tLoad; p.stepT[3] = tr.depA; p.tLoaded = tl1;
+            p.stepT[4] = tr.depA + (tr.stops.indexOf(dest) + 1) * rr(8, 14) * 60;
+            p.tOut = tl1; tr.pOut.push(p);
             S.ev.parcelShip.push([tr.depA, 0]);
           }
           S.ev.parcelIn.push([e, p.fee]);
           a.parcels.push(p); S.parcels.push(p);
         }
-      } }], ['go','street_p'], ['leave']);
+      } }], ['go','street'], ['leave']);
   }
 
   // ---- จำลองคิวแบบเรียงตามเวลา ----
@@ -656,20 +611,18 @@ function buildDay(date){
   while(heap.size){ const ev = heap.pop(); runAgent(S, ev.a, ev.t, heap); }
 
   // ---- สรุปผล ----
+  for(const tr of trains) tr.boardList.forEach(a => { if(a.boarded){ S.ev.board.push([a.tOut, 0]); if(a.ch === 'online') S.ev.online.push([a.tOut, a.price]); } });
   for(const k in S.ev){ const arr = S.ev[k].sort((a,b) => a[0]-b[0]); let s = 0;
     S.ev[k] = { t: arr.map(x => x[0]), c: arr.map(x => (s += x[1])) }; }
   S.waits.sort((a,b) => a[0]-b[0]);
   { let s = 0; S.waitT = S.waits.map(w => w[0]); S.waitC = S.waits.map(w => (s += w[1])); }
   S.agents.sort((a,b) => a.tIn - b.tIn);
-  for(const tr of trains) tr.boardList.forEach(a => { if(a.boarded) S.ev.board.t.push(a.tOut); });
-  S.ev.board.t.sort((a,b) => a-b);
   // ความหนาแน่นทั้งวัน (ทุก 5 นาที)
   const BIN = 300, nb = Math.ceil((CLOSE - OPEN) / BIN) + 1, diff = new Float64Array(nb + 1);
   for(const a of S.agents){ const i0 = clamp(Math.floor((a.tIn - OPEN)/BIN), 0, nb), i1 = clamp(Math.floor((a.tOut - OPEN)/BIN), 0, nb);
     if(i1 > i0){ diff[i0]++; diff[i1]--; } }
   S.occ = []; let c = 0; for(let i = 0; i < nb; i++){ c += diff[i]; S.occ.push(c); }
   S.occMax = Math.max(...S.occ, 1);
-  S.people = S.agents.length;
   return S;
 }
 
@@ -700,7 +653,7 @@ function runAgent(S, a, now, heap){
         F[bi] = end;
         if(z.prefix){ S.qn[zk] = (S.qn[zk] || 0) + 1; a.q = z.prefix + pad(S.qn[zk], 3); a.keys.push(a.q); }
         a.segs.push({ k:'queue', z:zk, t0:a.t, t1:start }, { k:'serve', z:zk, s:bi, t0:start, t1:end });
-        if(!z.gate) S.waits.push([start, (start - a.t) / 60, zk]);
+        S.waits.push([start, (start - a.t) / 60, zk]);
         if(o.qMark !== undefined) a.stepT[o.qMark] = a.t;
         if(o.sMark !== undefined) a.stepT[o.sMark] = start;
         if(o.eMark !== undefined) a.stepT[o.eMark] = end;
@@ -709,17 +662,17 @@ function runAgent(S, a, now, heap){
         a.t = end; a.pos = z.srv[bi]; a.node = z.entry;
         break;
       }
-      case 'sit': { // นั่งรอในห้องพักจนถึงเวลาเรียกขึ้นชานชาลา
+      case 'sit': { // นั่งรอในห้องพัก/ม้านั่งชานชาลาจนถึงเวลาเรียกขึ้นรถ
         const until = st[1]; a.stepT[st[2]] = a.t;
         if(a.t < until - 90){
           const s0 = ri(0, S.seats.length-1); let seat = null;
           for(let k = 0; k < S.seats.length; k++){ const s = S.seats[(s0+k) % S.seats.length];
             if(s.iv.every(([x,y]) => until + 20 <= x || a.t >= y)){ seat = s; break; } }
-          const p = seat ? [seat.x, seat.y] : [rr(3, 49), pick([27.4, 30.4]) + rr(-.25, .25)];
+          const p = seat ? [seat.x, seat.y] : [rr(38, 51.5), pick([22.6, 25.8, 29]) + rr(-.3, .3)];
           walkPts(a, [p], null);
           const t1 = Math.max(until, a.t + 30);
           if(seat) seat.iv.push([a.t, t1 + 20]);
-          a.segs.push({ k: seat ? 'sit' : 'stand', area:'hall', p, t0:a.t, t1 });
+          a.segs.push({ k: seat ? 'sit' : 'stand', area: seat ? seat.area : 'hall', p, t0:a.t, t1 });
           a.t = t1;
         }
         break;
@@ -728,22 +681,21 @@ function runAgent(S, a, now, heap){
         const tr = a.tr, pl = tr.track; a.stepT[st[1]] = a.t;
         if(a.t > tr.depA - 15){ // ตกขบวน
           a.missed = true; a.stepDefs = a.stepDefs.slice(0, st[1]+1).concat(['ตกขบวน · ออกจากสถานี']);
-          a.plan.splice(a.pc + 1, a.plan.length, ['go','p1_e'], ['svc','exitgate'], ['go','street'], ['leave', st[1]+1]);
+          a.plan.splice(a.pc + 1, a.plan.length, ['pt', N.hall_n, 'hall_n'], ['go','street'], ['leave', st[1]+1]);
           break;
         }
-        if(pl === 2) walkPts(a, a.node ? route(a.node, 'p2_w') : [N.p2_w], 'p2_w');
-        const cx = X_FRONT - (a.carI + .5) * 6.4;
-        const p = [clamp(cx + rr(-4, 4), 1, 72), rr(PLAT_Y[pl][0], PLAT_Y[pl][1])];
+        if(pl === 2) walkPts(a, [N.p1_c, N.p2_c], 'p2_c');
+        const cx = carX(tr, a.carI);
+        const p = [clamp(cx + rr(-3.5, 3.5), 2, 72), rr(PLAT_Y[pl][0], PLAT_Y[pl][1])];
         walkPts(a, [p], null);
-        let tb = tr.kind === 'origin' ? Math.max(a.t + rr(20, 240), tr.arrA + 120) : Math.max(a.t + 10, tr.arrA + 40 + R() * Math.max(30, tr.depA - tr.arrA - 100));
-        tb = Math.min(tb, tr.depA - 25);
+        let tb = tr.kind === 'origin' ? Math.max(a.t + rr(20, 240), tr.arrA + 120) : Math.max(a.t + 8, tr.arrA + 15 + R() * Math.max(20, tr.depA - tr.arrA - 40));
+        tb = Math.min(tb, tr.depA - 12);
         if(tb > a.t) a.segs.push({ k:'stand', area: 'plat' + pl, p, t0:a.t, t1:tb });
         a.t = Math.max(a.t, tb);
         break;
       }
       case 'board': {
-        const cx = X_FRONT - (a.carI + .5) * 6.4;
-        walkPts(a, [[cx + rr(-1.6, 1.6), DOOR_Y[a.tr.track]]], null);
+        walkPts(a, [[carX(a.tr, a.carI) + rr(-1.6, 1.6), DOOR_Y[a.tr.track]]], null);
         a.stepT[st[1]] = a.t; a.tOut = a.t; a.boarded = true;
         break;
       }
@@ -793,7 +745,7 @@ function trainStatus(tr, t){
   return ['ตรงเวลา','ok'];
 }
 const trTime = tr => tr.kind === 'terminal' ? tr.arrS : tr.depS;
-const trName = tr => tr.kind === 'terminal' ? `${tr.from} → ${STATION.here}` : `${tr.from} → ${tr.to}`;
+const trName = tr => `${tr.from} → ${tr.kind === 'terminal' ? STATION.here : tr.to}`;
 const cumAt = (e, t) => { let lo = 0, hi = e.t.length; while(lo < hi){ const m = (lo+hi) >> 1; if(e.t[m] <= t) lo = m+1; else hi = m; }
   return { n: lo, sum: lo ? e.c[lo-1] : 0 }; };
 const bsearch = (arr, t) => { let lo = 0, hi = arr.length; while(lo < hi){ const m = (lo+hi) >> 1; if(arr[m] <= t) lo = m+1; else hi = m; } return lo; };
@@ -801,7 +753,7 @@ const bsearch = (arr, t) => { let lo = 0, hi = arr.length; while(lo < hi){ const
 // คำนวณสถานะทุกคน ณ เวลาปัจจุบัน (ใช้ทั้งวาดภาพและแผงข้อมูล)
 let frame = null;
 function computeFrame(t){
-  const F = { t, people:[], parcels:[], zoneQ:{}, zoneS:{}, area:{hall:0, plat1:0, plat2:0, wh:0}, waiting:0 };
+  const F = { t, people:[], parcels:[], zoneQ:{}, zoneS:{}, area:{hall:0, plat1:0, plat2:0, store:0}, waiting:0 };
   for(const k in ZONES){ F.zoneQ[k] = []; F.zoneS[k] = 0; }
   const A = sim.agents;
   for(let i = 0; i < A.length; i++){
@@ -822,7 +774,7 @@ function computeFrame(t){
     if(p.tIn > t || (p.tOut !== undefined && p.tOut <= t)) continue;
     const sg = segAt(p, t); if(!sg || sg.t0 > t || sg.t1 <= t) continue;
     const pos = sg.k === 'move' ? walkPos(sg.cum ? sg : (sg.cum = cumOf(sg.pts), sg), t) : sg.p;
-    if(sg.slotSeg || (sg.k === 'at' && sg.z === 0)) F.area.wh++;
+    if(sg.slotSeg || (sg.k === 'at' && sg.z === 0)) F.area.store++;
     F.parcels.push({ p, pos, z: sg.k === 'at' ? sg.z : 0.25 });
   }
   return F;
@@ -832,7 +784,7 @@ const cumOf = pts => { const c = [0]; for(let i = 1; i < pts.length; i++) c.push
 /* ---------------- การวาดภาพ ---------------- */
 const cv = $('#cv'), ctx = cv.getContext('2d');
 let W = 0, Hh = 0, DPR = 1;
-const CX = 36, CY = 26, C30 = Math.cos(Math.PI/6);
+const CX = 37, CY = 28, C30 = Math.cos(Math.PI/6);
 const cam = { s: 12, rot: 0, px: 0, py: 0 };
 function resize(){ DPR = Math.min(window.devicePixelRatio || 1, 2); W = innerWidth; Hh = innerHeight;
   cv.width = W * DPR; cv.height = Hh * DPR; }
@@ -850,7 +802,7 @@ function homeView(){
   const wide = W > 900;
   const lb = $('#left').getBoundingClientRect().bottom;
   const box = wide ? [70, 150, W - 375, Hh - 10] : [8, lb + 8, W - 8, Hh - 70];
-  const cs = [[-1,4],[74,4],[74,48],[-1,48]].map(([x,y]) => { const r = rotP(x,y); return [(r[0]-r[1])*C30, (r[0]+r[1])*.5]; });
+  const cs = [[0,3],[74,3],[74,51],[0,51]].map(([x,y]) => { const r = rotP(x,y); return [(r[0]-r[1])*C30, (r[0]+r[1])*.5]; });
   const xs = cs.map(c => c[0]), ys = cs.map(c => c[1]);
   const bw = Math.max(...xs) - Math.min(...xs), bh = Math.max(...ys) - Math.min(...ys);
   cam.s = clamp(Math.min((box[2]-box[0]) / bw, (box[3]-box[1]) / bh), 3, 26);
@@ -891,46 +843,58 @@ const center = it => it.k === 'box' ? [(it.b[0]+it.b[2])/2, (it.b[1]+it.b[3])/2]
 
 // วัตถุคงที่ (ผนัง เคาน์เตอร์ เก้าอี้ ต้นไม้)
 const STATIC = [];
+const ROUND = { c:[60, 42], r:4.6 };   // วงเวียนหน้าสถานี
 (function buildStatic(){
-  const wall = '#dfe6e4', inner = '#e8eeec';
+  const wall = '#e2d9cf', inner = '#e8eeec';
   const segX = (y, xs, h, c) => xs.forEach(([a,b]) => addBox(STATIC, a, y - .15, b, y + .15, h, c));
   const segY = (x, ys, h, c) => ys.forEach(([a,b]) => addBox(STATIC, x - .15, a, x + .15, b, h, c));
-  segX(18, [[1,20],[40,42],[50,64.5],[67.5,73]], 2.4, wall);
-  segX(44, [[1,31],[37,61],[65,73]], 0.5, wall);
-  segY(1, [[18,44]], 2.4, wall); segY(73, [[18,44]], 0.5, wall);
-  segX(34, [[1,6],[9,18.5],[23.5,29],[37,39],[43,47.5],[50.5,53]], 1.1, inner);
-  segY(13, [[34,44]], 1.1, inner); segY(29, [[34,44]], 1.1, inner); segY(37, [[34,44]], 1.1, inner); segY(45, [[34,44]], 1.1, inner);
-  segY(53, [[18,26.5],[29.5,44]], 1.1, inner);
-  segX(25, [[53,70],[72,73]], 1.1, inner); segX(31.5, [[53,70],[72,73]], 1.1, inner);
-  segX(22, [[1,20]], 1.1, inner); segY(40, [[18,22]], 1.1, inner); segY(50, [[18,22]], 1.1, inner);
-  // เคาน์เตอร์ / ตู้
-  for(const k in ZONES){ const z = ZONES[k];
-    z.srv.forEach(([x, y]) => {
-      if(z.gate){ addBox(STATIC, x - 1.15, y - .6, x - .85, y + .6, 1.0, '#9fb3ae', { top:'#c7d6d2' }); addBox(STATIC, x + .85, y - .6, x + 1.15, y + .6, 1.0, '#9fb3ae', { top:'#c7d6d2' }); }
-      else if(z.kiosk) addBox(STATIC, x - .4, z.desk - .25, x + .4, z.desk + .3, 1.6, '#3d6fa8', { top:'#5b8cc4' });
-      else addBox(STATIC, x - .9, z.desk - .3, x + .9, z.desk + .3, 1.0, '#f2efe8', { top:'#ffffff' });
-    }); }
-  addBox(STATIC, 62, 33.3, 63.2, 34.1, .5, '#7d8a93', { top:'#aab6be' });            // ตาชั่ง
-  addBox(STATIC, 26.5, 21.7, 32.5, 21.9, 1.1, '#22313a', { z0:2.0, top:'#33464f', win:'#f2c230' });  // จอแสดงขบวนรถ
+  // ผนังอาคาร (ด้านชานชาลาเปิดโล่งช่วงห้องพักผู้โดยสาร)
+  segX(18, [[4,10],[12,30],[52,70]], 1.8, wall);
+  segX(30, [[4,10],[12,38],[44,70]], 0.6, wall);
+  segY(4, [[18,30]], 1.8, wall); segY(70, [[18,30]], 0.6, wall);
+  segY(18, [[18,30]], 1.2, inner); segY(30, [[18,30]], 1.2, inner); segY(52, [[18,30]], 1.2, inner); segY(64, [[18,30]], 1.2, inner);
+  segX(25.2, [[4,9.6],[12.4,18]], 1.0, inner);                                   // แนวเคาน์เตอร์ห้องสินค้า
+  // เคาน์เตอร์
+  for(const k in ZONES) for(const d of ZONES[k].desks) addBox(STATIC, d[0], d[1], d[2], d[3], 1.05, '#f2efe8', { top:'#ffffff' });
+  addBox(STATIC, 13.4, 25.3, 14.6, 25.9, .5, '#7d8a93', { top:'#aab6be' });          // ตาชั่งสินค้า
+  addBox(STATIC, 21, 22.4, 26, 23.2, .8, '#d8cfc2', { top:'#efe8dd' });              // โต๊ะนายสถานี
+  addBox(STATIC, 55.5, 19.2, 61, 19.9, 1.0, '#5c6b74', { top:'#8796a0', win:'#9fd18b' }); // แผงควบคุมสัญญาณ
+  addBox(STATIC, 44, 18.2, 49, 18.4, 1.0, '#22313a', { z0:2.0, top:'#33464f', win:'#f2c230' }); // ป้ายเวลาขบวนรถ
+  // เสาหลังคาชานชาลา
+  for(let x = 6; x <= 70; x += 6.4) addBox(STATIC, x - .15, 15.85, x + .15, 16.15, 3.4, '#a2483e', { top:'#b85a4f' });
+  // อนุสาวรีย์กลางวงเวียน
+  addBox(STATIC, ROUND.c[0] - .6, ROUND.c[1] - .6, ROUND.c[0] + .6, ROUND.c[1] + .6, 2.6, '#d9d4c7', { top:'#f1ede2' });
+  // รถที่จอดในลานจอด
+  const rc = mulberry32(77), cols = ['#c9ccd1','#ffffff','#40464f','#9fb2c8','#b84a3c','#d8d2c4'];
+  for(const y of [34.2, 38.8]) for(let x = 14; x < 50; x += 2.7){ if(rc() < .35) continue;
+    const c = cols[Math.floor(rc()*cols.length)];
+    addBox(STATIC, x, y - 2.1, x + 1.8, y + 2.1, 1.25, c, { top: c === '#40464f' ? '#596170' : '#eef1f4', win:'#3c4a55' }); }
   // ต้นไม้
   const trees = [];
-  for(let x = 3; x < 72; x += 7.5) trees.push([x + (x % 3), 47.3]);
-  for(let x = -6; x < 80; x += 9) trees.push([x, -1.5]);
-  trees.push([-3, 24], [-3, 34], [-3, 42], [76.5, 22], [76.5, 32], [76.5, 41]);
+  for(let x = 3; x < 72; x += 7.5) trees.push([x + (x % 3), 47.6]);
+  for(let x = -6; x < 80; x += 8) trees.push([x, -1.5]);
+  trees.push([-2.5, 22], [-2.5, 30], [-2.5, 38], [76, 24], [76, 34], [76, 44], [6, 40], [52, 33]);
   trees.forEach(p => STATIC.push({ k:'tree', p, r: .9 + ((p[0]*7) % 5) / 10 }));
+  STATIC.push({ k:'tree', p:[67, 35.5], r:2.3 });                                    // ต้นไม้ใหญ่หน้าสถานี
 })();
 function seatItems(){ const out = [];
-  for(const s of sim.seats){ out.push({ k:'box', b:[s.x - .3, s.y - .22, s.x + .3, s.y + .22], h:.42, z0:0, c:'#3f86c9', top:'#5aa0dd' });
-    const by = s.y + s.back * .2; out.push({ k:'box', b:[s.x - .3, by - .06, s.x + .3, by + .06], h:.85, z0:0, c:'#3a7dbf', top:'#5aa0dd' }); }
+  for(const s of sim.seats){ const c = s.area === 'hall' ? '#3f86c9' : '#b5793f', t = s.area === 'hall' ? '#5aa0dd' : '#cf9258';
+    out.push({ k:'box', b:[s.x - .3, s.y - .22, s.x + .3, s.y + .22], h:.42, z0:0, c, top:t });
+    const by = s.y + s.back * .2; out.push({ k:'box', b:[s.x - .3, by - .06, s.x + .3, by + .06], h:.85, z0:0, c, top:t }); }
   return out; }
 let SEATS = [];
 
+function circle0(c, r, fill){ const pts = []; for(let i = 0; i < 32; i++){ const a = i / 32 * Math.PI * 2; pts.push(P(c[0] + Math.cos(a)*r, c[1] + Math.sin(a)*r)); } poly(pts, fill); }
 function drawGround(F){
   ctx.fillStyle = '#eef3f1'; ctx.fillRect(0, 0, W, Hh);
-  rect0(-40, -6, 110, 62, '#e6eeea');                           // พื้นหญ้า
-  rect0(-40, 53.5, 110, 60, '#dde2e5');                         // ถนน
-  rect0(-40, 49.5, 110, 53.5, '#f2f3f1');                       // ทางเท้า
-  rect0(1, 44, 73, 49.5, '#f6f4ee');                            // ลานหน้าสถานี
+  rect0(-40, -8, 110, 62, '#e3ece6');                           // พื้นหญ้า
+  rect0(-40, -8, 110, -4, '#dde2e5');                           // ถนนฝั่งตะวันตกของราง
+  rect0(-40, 53.5, 110, 60, '#dde2e5');                         // ถนนหน้าสถานี
+  rect0(-40, 50, 110, 53.5, '#f2f3f1');                         // ทางเท้า
+  rect0(0, 30, 74, 50, '#e9ebea');                              // ลานจอดรถ
+  ctx.lineWidth = Math.max(1, cam.s * .06); ctx.strokeStyle = '#ffffff';
+  for(const y0 of [32, 36.6]) for(let x = 14; x <= 50; x += 2.7){ const a = P(x - .45, y0), b = P(x - .45, y0 + 4.4); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+  circle0(ROUND.c, ROUND.r + 1.2, '#d3d8d6'); circle0(ROUND.c, ROUND.r, '#bfe0b4'); circle0(ROUND.c, 1.6, '#e8e2d2');
   // ราง
   for(const tk of [1, 2]){ const cy = TRACK_Y[tk];
     rect0(-40, cy - 1.8, 110, cy + 1.8, '#d6cfc3');
@@ -942,33 +906,33 @@ function drawGround(F){
   // ชานชาลา
   const heat = mode === 'heat';
   const hc = (r) => r < .5 ? null : r < .85 ? 'rgba(224,162,27,.22)' : 'rgba(214,69,65,.25)';
-  rect0(-2, 14.8, 75, 18, '#e9ecee'); rect0(-2, 7.2, 75, 11.2, '#e9ecee');
+  rect0(-2, 14.8, 76, 18, '#e9ecee'); rect0(-2, 7.2, 76, 11.2, '#e9ecee');
   if(heat){ for(const k of ['plat1','plat2']){ const A = AREAS[k], c = hc(F.area[k] / A.cap * 2.2); if(c) rect0(...A.rect, c); } }
   ctx.lineWidth = Math.max(1.5, cam.s * .16); ctx.strokeStyle = '#f2c230';
-  for(const y of [15.25, 7.65, 10.75]){ const a = P(-2, y), b = P(75, y); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
-  for(const x of [5, 66]) rect0(x - 1.2, 11.2, x + 1.2, 14.8, '#c9b48e');   // ทางข้าม
+  for(const y of [15.25, 7.65, 10.75]){ const a = P(-2, y), b = P(76, y); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+  for(const x of [9, 46]) rect0(x - 1.2, 11.2, x + 1.2, 14.8, '#c9b48e');   // ทางข้ามราง (สินค้า / ผู้โดยสาร)
   // อาคาร
-  rect0(1, 18, 73, 44, '#fbfbfa');
-  rect0(1, 31, 53, 34, '#f4f6f5'); rect0(29, 34, 37, 44, '#f4f6f5');
-  rect0(1, 22, 50, 31, heat ? mixHeat('#f7f9f8', F.area.hall / AREAS.hall.cap) : '#f7f9f8');
-  rect0(53, 18, 73, 25, heat ? mixHeat('#f1ede6', F.area.wh / AREAS.wh.cap) : '#f1ede6');
+  rect0(4, 18, 70, 30, '#fbfbfa');
+  rect0(...AREAS.hall.rect, heat ? mixHeat('#f7f9f8', F.area.hall / AREAS.hall.cap) : '#f7f9f8');
+  rect0(...AREAS.store.rect, heat ? mixHeat('#f1ede6', F.area.store / AREAS.store.cap) : '#f1ede6');
+  for(const r of ROOMS) rect0(...r.rect, r.floor);
   for(const k in ZONES){ const z = ZONES[k]; const n = F.zoneQ[k].length + F.zoneS[k];
     rect0(...z.rect, heat ? mixHeat(z.floor, n / z.cap) : z.floor); }
-  // ทางเดินแถวคิว
-  ctx.lineWidth = Math.max(1, cam.s * .08);
-  for(const k of ['ticket','booking','parcel']){ const q = ZONES[k].queue; ctx.strokeStyle = 'rgba(47,143,127,.25)';
-    const rows = Math.floor(Math.abs(q.yF - q.yN) / .8) + 1, dir = Math.sign(q.yF - q.yN);
-    for(let r = 0; r < rows - 1; r++){ const y = q.yN + dir * (r + .5) * .8; const a = P(r % 2 ? q.x0 + .8 : q.x0 - .3, y), b = P(r % 2 ? q.x1 + .3 : q.x1 - .8, y);
-      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); } }
+  rect0(38, 30, 44, 31.4, '#ece6da');                             // ทางเข้าหลัก
+}
+function drawRoof(){ // หลังคาชานชาลา (โปร่งแสง) สีแดงตามภาพถ่ายดาวเทียม
+  if(cam.s < 3.5) return;
+  poly([P(2, 14.6, 3.6), P(72, 14.6, 3.6), P(72, 18, 3.6), P(2, 18, 3.6)], 'rgba(170,70,58,.16)');
+  ctx.lineWidth = Math.max(1, cam.s * .12); ctx.strokeStyle = 'rgba(160,60,50,.45)';
+  const a = P(2, 14.6, 3.6), b = P(72, 14.6, 3.6); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
 }
 function mixHeat(hex, r){ r = clamp(r, 0, 1.2);
   const n = parseInt(hex.slice(1), 16), base = [n >> 16, n >> 8 & 255, n & 255];
   const tgt = r < .5 ? [120, 200, 150] : r < .85 ? [240, 190, 80] : [230, 90, 80];
   const f = .25 + .5 * Math.min(1, r);
   return `rgb(${base.map((v,i) => Math.round(v + (tgt[i]-v)*f)).join(',')})`; }
-
-const COLORS = { dep:'#2f8f7f', arr:'#3f78d1', book:'#8a63d2', info:'#7b8794', send:'#e08a2c', pick:'#d0702a' };
-const TYPE_TXT = { dep:'ผู้โดยสารขาออก', arr:'ผู้โดยสารขาเข้า', book:'จองตั๋วล่วงหน้า', info:'ติดต่อสอบถาม', send:'ฝากส่งพัสดุ', pick:'รับพัสดุ' };
+const COLORS = { dep:'#2f8f7f', arr:'#3f78d1', book:'#8a63d2', send:'#e08a2c', pick:'#c0602a' };
+const TYPE_TXT = { dep:'ผู้โดยสารขาออก', arr:'ผู้โดยสารขาเข้า', book:'จองตั๋วล่วงหน้า', send:'ฝากส่งสินค้า', pick:'รับสินค้า' };
 const waitColor = m => m < 5 ? '#2f9e5b' : m < 15 ? '#e0a21b' : '#d64541';
 let hits = [];
 function drawPerson(o, x, y, color, opt){
@@ -1011,15 +975,17 @@ function render(dtReal){
   for(const it of SEATS) items.push(it);
   // เจ้าหน้าที่
   for(const k in ZONES){ const z = ZONES[k]; if(!z.staffOn || !z.staffOn(F.t)) continue;
-    const n = z.nAt(F.t); z.srv.slice(0, n).forEach(([x]) => items.push({ k:'staff', p:[x, z.staff] })); }
+    const n = z.nAt(F.t); z.staff.forEach((p, i) => { if(i < n || i >= z.srv.length) items.push({ k:'staff', p }); }); }
+  if(F.t >= OPEN + 1800) for(const r of ROOMS) (r.staff || []).forEach(p => items.push({ k:'staff', p }));
   // ขบวนรถ
   for(const tr of sim.trains){ const off = trainOffset(tr, F.t); if(off === null) continue;
     const y = TRACK_Y[tr.track];
-    for(let i = 0; i < tr.cars; i++){ const cx = X_FRONT - (i + .5) * 6.4 + off; if(cx < -36 || cx > 106) continue;
-      const bag = i === 0 && tr.T.bag;
-      const col = bag ? '#5d6b75' : tr.T.color;
+    const loco = locoI(tr);
+    for(let i = 0; i < tr.cars; i++){ const cx = carX(tr, i) + off; if(cx < -36 || cx > 110) continue;
+      const bag = i === bagI(tr) && tr.T.bag;
+      const col = i === loco ? '#2d4f6c' : bag ? '#5d6b75' : tr.T.color;
       const it0 = items.length;
-      addBox(items, cx - 3, y - 1.3, cx + 3, y + 1.3, 2.7, col, { win: bag ? null : '#cfe6f5', top:'#d9dee2' });
+      addBox(items, cx - 3, y - 1.3, cx + 3, y + 1.3, tr.T.freight && i !== loco ? 2.2 : 2.7, col, { win: bag || (tr.T.freight && i !== loco) ? null : '#cfe6f5', top: tr.T.freight && i !== loco ? shade(col, 1.15) : '#d9dee2' });
       for(let j = it0; j < items.length; j++) items[j].tr = tr;
     } }
   // คน
@@ -1052,14 +1018,16 @@ function render(dtReal){
       drawPerson(o, it.p[0], it.p[1], col, { sit: o.st === 'sit', carry, ring: a === selA });
     }
   }
+  drawRoof();
   // ป้ายชื่อโซน
   if(cam.s > 5.5){
+    for(const r of ROOMS){ const [sx, sy] = P(r.label[0], r.label[1], 2.2); pill(sx, sy, r.name); }
     for(const kz of SVC_ORDER){ const z = ZONES[kz]; const n = F.zoneQ[kz].length + F.zoneS[kz]; const [sx, sy] = P(z.label[0], z.label[1], 2.6);
       const r = pill(sx, sy, z.name, n + ' คน', ratioCol(n / z.cap)); labelHits.push({ ...r, zone:kz }); }
     for(const ka in AREAS){ const A = AREAS[ka]; const n = F.area[ka]; const [sx, sy] = P(A.label[0], A.label[1], 2.6);
       pill(sx, sy, A.name, n + (A.parcels ? ' ชิ้น' : ' คน'), ratioCol(n / A.cap)); }
     for(const tr of sim.trains){ const off = trainOffset(tr, F.t); if(off === null || Math.abs(off) > 40) continue;
-      const [sx, sy] = P(X_FRONT - tr.len/2 + off, TRACK_Y[tr.track], 4.2);
+      const [sx, sy] = P(X0 + tr.len/2 + off, TRACK_Y[tr.track], 4.2);
       const r = pill(sx, sy, `ขบวน ${tr.no} · ${tr.kind === 'terminal' ? 'สิ้นสุด' : tr.to}`, trainStatus(tr, F.t)[0], ['#e3f2ef','#246f63']);
       labelHits.push({ ...r, train:tr }); }
   }
@@ -1074,7 +1042,7 @@ function statusOf(a, t){
   if(t >= a.tOut){ if(a.boarded) return t >= a.tr.depA ? 'ออกเดินทางแล้ว' : 'ขึ้นรถแล้ว'; return a.missed ? 'ตกขบวน · ออกแล้ว' : 'ออกจากสถานีแล้ว'; }
   const sg = segAt(a, t);
   if(sg.k === 'queue') return ZONES[sg.z].wait;
-  if(sg.k === 'serve') return ZONES[sg.z].now;
+  if(sg.k === 'serve') return sg.z === 'goods' && a.type === 'pick' ? 'กำลังรับสินค้า' : sg.z === 'ticket' && a.type === 'book' ? 'กำลังจองตั๋ว' : ZONES[sg.z].now;
   if(sg.k === 'sit') return 'นั่งรอขบวน';
   if(sg.k === 'stand') return sg.area === 'hall' ? 'ยืนรอในห้องพัก' : 'รอขึ้นรถ';
   if(a.type === 'arr' && !a.stepT[1]) return 'ลงจากรถ';
@@ -1085,7 +1053,7 @@ function parcelStatus(p, t){
   if(p.dir === 'out'){
     if(t < p.stepT[0]) return 'ยังไม่รับฝาก';
     if(p.tr && t >= p.tr.depA) return 'ออกเดินทางแล้ว';
-    if(p.stepT[2] !== undefined && t >= p.stepT[2]) return t >= p.stepT[2] + 85 ? 'อยู่บนตู้สัมภาระ' : 'กำลังขนขึ้นรถ';
+    if(p.stepT[2] !== undefined && t >= p.stepT[2]) return t >= p.tLoaded ? 'อยู่บนตู้สัมภาระ' : 'กำลังขนขึ้นรถ';
     if(t >= p.stepT[1]) return p.tr ? 'อยู่ในคลัง · รอขบวน ' + p.tr.no : 'อยู่ในคลัง · รอขบวนวันถัดไป';
     return 'รอนำเข้าคลัง';
   }
@@ -1121,7 +1089,7 @@ function renderDetail(){
     if(a.type === 'dep'){
       lines.push(`ขบวน <b>${tr.no}</b> ${tr.type} ${trName(tr)} · ออก <b>${hhmm(tr.depS)}</b>${tr.delay ? ` <span style="color:var(--bad)">(ล่าช้า ${Math.round(tr.delay/60)} น.)</span>` : ''}`);
       lines.push(`ชานชาลา <b>${tr.track}</b> · ตู้ <b>${a.carI + 1}</b> ที่นั่ง <b>${a.seat}</b> · ชั้น ${a.cls} · <b>${fmtN(a.price)}</b> บาท`);
-      lines.push(`ช่องทาง: ${a.ch === 'online' ? 'ตั๋วออนไลน์ (สแกนที่จุดตรวจตั๋ว)' : a.ch === 'kiosk' ? 'ตู้จำหน่ายตั๋วอัตโนมัติ' : 'เคาน์เตอร์จำหน่ายตั๋ว'}`);
+      lines.push(`ช่องทาง: ${a.ch === 'online' ? 'ตั๋วออนไลน์ (ตรวจบนขบวนรถ)' : 'ช่องจำหน่ายตั๋วสถานี'}`);
     } else if(a.type === 'arr'){
       lines.push(`ขบวน <b>${tr.no}</b> ${tr.type} ${trName(tr)} · ถึง <b>${hhmm(tr.arrA)}</b> ชานชาลา ${tr.track} · ตู้ ${a.carI + 1}`);
     } else if(a.type === 'book'){
@@ -1130,7 +1098,7 @@ function renderDetail(){
     } else if(a.type === 'send' || a.type === 'pick'){
       const ps = a.parcels.filter(p => a.type === 'pick' || t >= p.tIn);
       if(ps.length) lines.push('<div class="plist">' + ps.map(p => `<div data-parcel="${p.id}"><span><b>${p.code}</b> ${p.dir === 'out' ? '→ ' + p.dest : 'จาก ' + p.from} · ${p.w} กก.</span><span>${parcelStatus(p, t)}</span></div>`).join('') + '</div>');
-      else lines.push('พัสดุ: ยังไม่ได้รับฝาก');
+      else lines.push('สินค้า: ยังไม่ได้รับฝาก');
     }
     lines.push(`อยู่ในสถานี <b>${minTxt(inSt)}</b>${waitNow !== null ? ` · รอคิวมาแล้ว <b style="color:${waitColor(waitNow/60)}">${minTxt(waitNow)}</b>` : ''}`);
     h += `<div class="info">${lines.join('<br>')}</div>`;
@@ -1153,8 +1121,8 @@ function renderDetail(){
       <div class="kv"><span>เวลาจริง${t < tr.arrA ? ' (คาดการณ์)' : ''}</span><b>${tr.kind === 'origin' ? '—' : hhmm(tr.arrA)} / ${tr.kind === 'terminal' ? '—' : hhmm(tr.depA)}</b></div>
       <div class="kv"><span>ขึ้นรถแล้ว</span><b>${fmtN(boarded)}</b><em> / ${fmtN(tr.boardList.length)} คน · รออยู่ ${onPlat}</em></div>
       <div class="kv"><span>ลงจากรถ</span><b>${fmtN(alighted)}</b><em> คน</em></div>
-      <div class="kv"><span>พัสดุขึ้นรถ</span><b>${tr.pOut.filter(p => t >= p.stepT[2] + 85).length}</b><em> / ${tr.pOut.length} ชิ้น</em></div>
-      <div class="kv"><span>พัสดุลงจากรถ</span><b>${tr.pIn.filter(p => t >= p.stepT[2]).length}</b><em> / ${tr.pIn.length} ชิ้น</em></div></div>`;
+      <div class="kv"><span>สินค้าขึ้นรถ</span><b>${tr.pOut.filter(p => t >= p.tLoaded).length}</b><em> / ${tr.pOut.length} ชิ้น</em></div>
+      <div class="kv"><span>สินค้าลงจากรถ</span><b>${tr.pIn.filter(p => t >= p.stepT[2]).length}</b><em> / ${tr.pIn.length} ชิ้น</em></div></div>`;
     if(tr.stops.length) h += `<div class="note">จอดต่อ: ${tr.stops.join(' · ')}</div>`;
   }
   h += `<div class="note">ข้อมูลจำลองเพื่อสาธิตระบบ</div>`;
@@ -1176,20 +1144,19 @@ function renderPanels(){
   $('#trList').innerHTML = list.slice(Math.max(0, i0 - 1), i0 + 6).map(tr => { const [st, c] = trainStatus(tr, t);
     return `<div class="tr" data-train="${tr.no}"><span class="no">${tr.no}</span><span class="nm"><b>${trName(tr)}</b><small>${tr.type} · ${tr.kind === 'terminal' ? 'ถึง' : 'ออก'} ${hhmm(trTime(tr))} · ชานชาลา ${tr.track}</small></span><span class="st ${c}">${st}</span></div>`; }).join('');
   // สรุป
-  const e = sim.ev, sc = cumAt(e.saleCounter, t), sk = cumAt(e.saleKiosk, t), so = cumAt(e.online, t), bk = cumAt(e.booking, t);
+  const e = sim.ev, sc = cumAt(e.saleCounter, t), so = cumAt(e.online, t), bk = cumAt(e.booking, t);
   const pi = cumAt(e.parcelIn, t), ps = cumAt(e.parcelShip, t), pa = cumAt(e.parcelArr, t), pp = cumAt(e.parcelPick, t);
   $('#sumT').textContent = 'ถึง ' + hhmm(t) + ' น.';
   $('#sum').innerHTML = `<div class="sub" style="margin-top:0">การจำหน่ายตั๋ว</div><div class="grid2">
-    <div class="kv"><span>เคาน์เตอร์</span><b>${fmtN(sc.n)}</b><em> ใบ</em></div>
-    <div class="kv"><span>ตู้อัตโนมัติ</span><b>${fmtN(sk.n)}</b><em> ใบ</em></div>
-    <div class="kv"><span>ตั๋วออนไลน์ (สแกน)</span><b>${fmtN(so.n)}</b><em> ใบ</em></div>
-    <div class="kv"><span>รายได้ขายตั๋ว</span><b>${fmtN(sc.sum + sk.sum)}</b><em> บาท</em></div>
+    <div class="kv"><span>ขายที่ช่องตั๋ว</span><b>${fmtN(sc.n)}</b><em> ใบ</em></div>
+    <div class="kv"><span>ใช้ตั๋วออนไลน์</span><b>${fmtN(so.n)}</b><em> ใบ</em></div>
+    <div class="kv"><span>รายได้ขายตั๋ว</span><b>${fmtN(sc.sum)}</b><em> บาท</em></div>
     <div class="kv"><span>จองล่วงหน้า</span><b>${fmtN(bk.n)}</b><em> รายการ</em></div>
     <div class="kv"><span>ยอดจอง</span><b>${fmtN(bk.sum)}</b><em> บาท</em></div></div>
-    <div class="sub">รับ-ส่งสินค้า / พัสดุ</div><div class="grid2">
+    <div class="sub">ห้องรับ-ส่งสินค้า</div><div class="grid2">
     <div class="kv"><span>รับฝากส่ง</span><b>${fmtN(pi.n)}</b><em> ชิ้น · ${fmtN(pi.sum)} บ.</em></div>
     <div class="kv"><span>ส่งออกกับขบวนแล้ว</span><b>${fmtN(ps.n)}</b><em> ชิ้น</em></div>
-    <div class="kv"><span>พัสดุมาถึง</span><b>${fmtN(pa.n)}</b><em> ชิ้น</em></div>
+    <div class="kv"><span>สินค้ามาถึง</span><b>${fmtN(pa.n)}</b><em> ชิ้น</em></div>
     <div class="kv"><span>ผู้รับมารับแล้ว</span><b>${fmtN(pp.n)}</b><em> ชิ้น</em></div></div>`;
   // แท็บด้านบน
   const inSt = F.people.length;
@@ -1225,12 +1192,12 @@ function drawSpark(){
   g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.strokeStyle = '#2f8f7f'; g.lineWidth = 1.6; g.stroke();
   const x = (T - OPEN) / (CLOSE - OPEN) * w; g.strokeStyle = 'rgba(29,43,42,.35)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke();
   g.fillStyle = '#6b7b79'; g.font = '11px Chakra Petch'; g.textBaseline = 'top';
-  for(let hr = 6; hr <= 22; hr += 4){ const xx = (hr*3600 - OPEN) / (CLOSE - OPEN) * w; g.fillText(pad(hr) + ':00', xx - 14, 0); }
+  for(let hr = Math.ceil(OPEN/3600) + 1; hr < CLOSE/3600; hr += 3){ const xx = (hr*3600 - OPEN) / (CLOSE - OPEN) * w; g.fillText(pad(hr) + ':00', xx - 14, 0); }
 }
 function renderLegend(){
   $('#legend').innerHTML = mode === 'wait'
     ? [['#2f9e5b','รอ < 5 น.'],['#e0a21b','5–15 น.'],['#d64541','> 15 น.']].map(([c, t]) => `<span><i style="background:${c}"></i>${t}</span>`).join('')
-    : [['dep','ขาออก'],['arr','ขาเข้า'],['book','จองตั๋ว'],['send','พัสดุ'],['info','สอบถาม']].map(([k, t]) => `<span><i style="background:${COLORS[k]}"></i>${t}</span>`).join('')
+    : [['dep','ขาออก'],['arr','ขาเข้า'],['book','จองตั๋ว'],['send','ส่งสินค้า'],['pick','รับสินค้า']].map(([k, t]) => `<span><i style="background:${COLORS[k]}"></i>${t}</span>`).join('')
       + '<span><i style="background:#2c4a63"></i>จนท.</span>';
 }
 
@@ -1240,7 +1207,7 @@ function loadDate(d, t){
   T = clamp(t, OPEN, CLOSE); snapAll = true; sel = null;
   $('#dD').value = d.getDate(); $('#dM').value = d.getMonth(); $('#dY').value = d.getFullYear();
   const pax = sim.agents.filter(a => a.type === 'dep' || a.type === 'arr').length;
-  $('#ftxt').textContent = `ผู้โดยสาร ${fmtN(pax)} ราย · ผู้ใช้บริการอื่น ${fmtN(sim.agents.length - pax)} ราย · พัสดุ ${fmtN(sim.parcels.length)} ชิ้น · ข้อมูลจำลอง`;
+  $('#ftxt').textContent = `ผู้โดยสาร ${fmtN(pax)} ราย · ผู้ใช้บริการอื่น ${fmtN(sim.agents.length - pax)} ราย · สินค้า ${fmtN(sim.parcels.length)} ชิ้น · ข้อมูลจำลอง`;
   frame = computeFrame(T); drawSpark(); renderPanels(); renderClock();
 }
 function today(){ const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
@@ -1317,7 +1284,7 @@ function pickAt(x, y){
   // คลิกโดนขบวนรถ
   const w = screenToWorld(x, y);
   for(const tr of sim.trains){ const off = trainOffset(tr, T); if(off === null) continue;
-    if(Math.abs(w[1] - TRACK_Y[tr.track]) < 2.5 && w[0] > X_FRONT - tr.len + off && w[0] < X_FRONT + off){ sel = { kind:'train', obj:tr }; renderDetail(); return; } }
+    if(Math.abs(w[1] - TRACK_Y[tr.track]) < 2.5 && w[0] > X0 + off && w[0] < X0 + tr.len + off){ sel = { kind:'train', obj:tr }; renderDetail(); return; } }
   sel = null; renderDetail();
 }
 
@@ -1334,7 +1301,7 @@ function tick(now){
 }
 addEventListener('resize', () => { resize(); drawSpark(); });
 resize(); homeView(); renderLegend();
-loadDate(today(), 7*3600);
+loadDate(today(), 6.9*3600);
 requestAnimationFrame(tick);
 </script>
 </body>
