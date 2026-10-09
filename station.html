@@ -323,8 +323,8 @@ const ZONES = {
 const SVC_ORDER = ['ticket','goods','shop'];
 const AREAS = { // พื้นที่อื่น ๆ ที่แสดงจำนวนคน
   hall:{ name:'ห้องพักผู้โดยสาร', rect:[45.4,18,60,30], cap:110, label:[54,23.2] },
-  plat1:{ name:'ชานชาลา 1', rect:[0,14.8,76,18], cap:140, label:[30,16.4] },
-  plat2:{ name:'ชานชาลา 2', rect:[0,7.2,76,11.2], cap:140, label:[30,9.2] },
+  plat1:{ name:'ชานชาลา 1', rect:[0,14.8,76,18], cap:140, label:[71,16.4] },
+  plat2:{ name:'ชานชาลา 2', rect:[0,7.2,76,11.2], cap:140, label:[71,9.2] },
   store:{ name:'สินค้าในห้องเก็บ', rect:[10,18,24,25.2], cap:70, label:[17,21.2], parcels:true },
 };
 const ROOMS = [ // ห้องที่ไม่มีคิวบริการ (แสดงชื่ออย่างเดียว)
@@ -809,11 +809,13 @@ const CX = 37, CY = 28, C30 = Math.cos(Math.PI/6);
 const cam = { s: 12, rot: 0, px: 0, py: 0 };
 function resize(){ DPR = Math.min(window.devicePixelRatio || 1, 2); W = innerWidth; Hh = innerHeight;
   cv.width = W * DPR; cv.height = Hh * DPR; }
-function rotP(x, y){ x -= CX; y -= CY;
+// FLIP: กลับด้านหน้า-หลัง ให้รางรถไฟ/ชานชาลาอยู่ด้านหน้า และลานจอดรถอยู่ด้านหลัง (ลำดับห้องซ้าย-ขวาเหมือนเดิม)
+const FLIP = true;
+function rotP(x, y){ if(FLIP) y = 2*CY - y; x -= CX; y -= CY;
   switch(cam.rot){ case 1: return [-y, x]; case 2: return [-x, -y]; case 3: return [y, -x]; default: return [x, y]; } }
 function unrot(rx, ry){ let x, y;
   switch(cam.rot){ case 1: x = ry; y = -rx; break; case 2: x = -rx; y = -ry; break; case 3: x = -ry; y = rx; break; default: x = rx; y = ry; }
-  return [x + CX, y + CY]; }
+  x += CX; y += CY; if(FLIP) y = 2*CY - y; return [x, y]; }
 const pr = (rx, ry, z = 0) => [W/2 + cam.px + (rx - ry) * C30 * cam.s, Hh/2 + cam.py + ((rx + ry) * .5 - z) * cam.s];
 const P = (x, y, z = 0) => { const r = rotP(x, y); return pr(r[0], r[1], z); };
 function screenToWorld(sx, sy){ const u = (sx - W/2 - cam.px) / (C30 * cam.s), v = (sy - Hh/2 - cam.py) / cam.s * 2;
@@ -870,8 +872,8 @@ const ROUND = { c:[60, 42], r:4.6 };   // วงเวียนหน้าส�
   const segX = (y, xs, h, c) => xs.forEach(([a,b]) => addBox(STATIC, a, y - .15, b, y + .15, h, c));
   const segY = (x, ys, h, c) => ys.forEach(([a,b]) => addBox(STATIC, x - .15, a, x + .15, b, h, c));
   // ผนังอาคาร (ด้านชานชาลาเปิดโล่งช่วงห้องพักผู้โดยสาร)
-  segX(18, [[4,16],[18,38],[60,70]], 1.8, wall);
-  segX(30, [[4,16],[18,49],[55,70]], 0.6, wall);
+  segX(18, [[4,16],[18,38],[60,70]], FLIP ? 0.6 : 1.8, wall);
+  segX(30, [[4,16],[18,49],[55,70]], FLIP ? 1.8 : 0.6, wall);
   segY(4, [[18,30]], 1.8, wall); segY(70, [[18,30]], 0.6, wall);
   segY(10, [[18,30]], 1.2, inner); segY(24, [[18,30]], 1.2, inner); segY(32, [[18,30]], 1.2, inner); segY(38, [[18,30]], 1.2, inner);
   segY(60, [[18,23],[25.5,30]], 1.2, inner);                                     // ประตูจากห้องพักเข้าร้านสะดวกซื้อ
