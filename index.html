@@ -731,6 +731,7 @@
         <button type="button" class="btn-primary" id="addTrainSaveBtn">บันทึกขบวนนี้</button>
         <button type="button" class="btn-ghost" id="addTrainCancelBtn">ยกเลิก</button>
       </div>
+      <button type="button" class="btn-ghost" id="deleteTrainBtn" style="display:none;width:100%;margin-top:8px;color:#b3261e;">🗑️ ลบขบวนที่เพิ่มเองนี้</button>
       <div class="note">ขบวนที่เพิ่มเองจะถูกบันทึกไว้ในเบราว์เซอร์นี้ และปรากฏในรายการเลือกขบวนรถของสถานีนั้นๆ ทันที</div>
     </div>
   </div>
@@ -3078,11 +3079,27 @@ const addTrainForm = document.getElementById('addTrainForm');
 const addTrainSaveBtn = document.getElementById('addTrainSaveBtn');
 const addTrainCancelBtn = document.getElementById('addTrainCancelBtn');
 
+const deleteTrainBtn = document.getElementById('deleteTrainBtn');
+
 if(addTrainBtn){
   addTrainBtn.addEventListener('click', ()=>{
     addTrainForm.style.display = addTrainForm.style.display === 'none' ? 'block' : 'none';
     if(addTrainForm.style.display === 'block'){
-      document.getElementById('newTrainStation').value = stationSelect.value;
+      const curTrain = trainSelect.value;
+      const curRec = curTrain ? ALL_TRAINS[curTrain] : null;
+      if(curRec && curRec.custom){
+        // editing an existing custom train: prefill its saved data and offer deletion
+        document.getElementById('newTrainNo').value = curTrain;
+        document.getElementById('newTrainMeta').value = curRec.meta || '';
+        document.getElementById('newTrainStation').value = stationSelect.value;
+        const stationRec = curRec.schedule[stationSelect.value];
+        document.getElementById('newTrainArr').value = stationRec ? stationRec.arr : '';
+        document.getElementById('newTrainDep').value = stationRec ? stationRec.dep : '';
+        deleteTrainBtn.style.display = 'block';
+      } else {
+        document.getElementById('newTrainStation').value = stationSelect.value;
+        deleteTrainBtn.style.display = 'none';
+      }
     }
   });
 }
@@ -3119,6 +3136,24 @@ if(addTrainSaveBtn){
     populateTrains();
     if(stationSelect.value === station) updateBadgeAndSchedule();
     addTrainSaveBtn.disabled = false;
+  });
+}
+if(deleteTrainBtn){
+  deleteTrainBtn.addEventListener('click', async ()=>{
+    const trainNo = document.getElementById('newTrainNo').value.trim();
+    if(!trainNo || !ALL_TRAINS[trainNo] || !ALL_TRAINS[trainNo].custom) return;
+    if(!confirm('ลบขบวน ' + trainNo + ' ที่เพิ่มเองออกจากเครื่องนี้ใช่ไหม?')) return;
+    await storageDelete('customtrain:' + trainNo);
+    delete ALL_TRAINS[trainNo];
+    showToast('ลบขบวน ' + trainNo + ' แล้ว');
+    addTrainForm.style.display = 'none';
+    deleteTrainBtn.style.display = 'none';
+    document.getElementById('newTrainNo').value = '';
+    document.getElementById('newTrainMeta').value = '';
+    document.getElementById('newTrainArr').value = '';
+    document.getElementById('newTrainDep').value = '';
+    populateTrains();
+    updateBadgeAndSchedule();
   });
 }
 
