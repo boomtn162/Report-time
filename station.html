@@ -376,7 +376,11 @@ function buildDay(date){
   const seed = date.getFullYear()*10000 + (date.getMonth()+1)*100 + date.getDate();
   R = mulberry32(seed * 2654435761 >>> 0);
   const dow = date.getDay();
-  const dayF = (dow === 0 || dow === 5 || dow === 6) ? 1.25 : 1;
+  const weekend = dow === 0 || dow === 5 || dow === 6;
+  const dayF = weekend ? 1.25 : 1;
+  // จำนวนผู้มาใช้บริการทั้งวัน: เฉลี่ย 800-1,000 คน (ศุกร์-อาทิตย์ค่อนไปทางสูง)
+  const TARGET = weekend ? ri(900, 1000) : ri(800, 950);
+  const OVER = 1.6;   // สร้างเผื่อไว้ก่อน แล้วตัดให้เหลือเท่า TARGET
   const S = { date, trains:[], agents:[], parcels:[], ev:{}, waits:[], srv:{}, qn:{}, seq:{tk:0,snd:0,rcv:0} };
   for(const k of ['saleCounter','online','booking','shop','parcelIn','parcelShip','parcelArr','parcelPick','board','alight']) S.ev[k] = [];
   for(const k in ZONES) S.srv[k] = ZONES[k].srv.map(() => 0);
@@ -435,7 +439,7 @@ function buildDay(date){
   // ---- ผู้โดยสารขาออก ----
   for(const tr of trains){
     if(tr.kind === 'terminal' || !tr.T.board) continue;
-    const n = Math.round(tr.T.board * dayF * rr(.7, 1.25));
+    const n = Math.round(tr.T.board * OVER * dayF * rr(.7, 1.25));
     for(let i = 0; i < n; i++){
       const ch = R() < .25 ? 'online' : 'counter';
       let t0 = tr.depS - (8 + Math.pow(R(), 1.5) * 60) * 60;
@@ -468,7 +472,7 @@ function buildDay(date){
   // ---- ผู้โดยสารขาเข้า ----
   for(const tr of trains){
     if(tr.kind === 'origin' || !tr.T.alight) continue;
-    const n = Math.round(tr.T.alight * dayF * rr(.7, 1.25));
+    const n = Math.round(tr.T.alight * OVER * dayF * rr(.7, 1.25));
     for(let i = 0; i < n; i++){
       const carI = paxCar(tr);
       const t0 = tr.arrA + 10 + R() * Math.min(100, Math.max(20, tr.depA - tr.arrA - 10));
@@ -488,7 +492,7 @@ function buildDay(date){
       if(R()*1.4 < w) return t; } };
   // ---- จองตั๋วล่วงหน้า (ใช้ช่องจำหน่ายตั๋วเดียวกัน) ----
   const pax = trains.filter(t => t.T.board && t.kind !== 'terminal');
-  const nBook = Math.round(18 * dayF * rr(.8, 1.2));
+  const nBook = Math.round(18 * OVER * dayF * rr(.8, 1.2));
   for(let i = 0; i < nBook; i++){
     const tr = pick(pax.filter(t => t.type !== 'ท้องถิ่น'));
     const travel = new Date(date); travel.setDate(travel.getDate() + ri(1, 45));
@@ -503,7 +507,7 @@ function buildDay(date){
   }
 
   // ---- ลูกค้าร้านสะดวกซื้อ (คนทั่วไป) ----
-  const nShop = Math.round(45 * dayF * rr(.8, 1.2));
+  const nShop = Math.round(45 * OVER * dayF * rr(.8, 1.2));
   for(let i = 0; i < nShop; i++){
     const ag = mkAgent('shop', sampleT(5.6*3600, 19.3*3600), { spend: ri(15, 220) });
     ag.stepDefs = ['เข้าร้าน','ชำระเงิน','เสร็จสิ้น'];
@@ -579,7 +583,7 @@ function buildDay(date){
     }
   }
   // ขาออก: ผู้มาฝากส่งสินค้า
-  const nSend = Math.round(28 * dayF * rr(.8, 1.2));
+  const nSend = Math.round(28 * OVER * dayF * rr(.8, 1.2));
   for(let i = 0; i < nSend; i++){
     const nP = R() < .65 ? 1 : ri(2, 3);
     const ag = mkAgent('send', sampleT(7.5*3600, 16.3*3600), { parcels:[], nP });
@@ -617,6 +621,16 @@ function buildDay(date){
           a.parcels.push(p); S.parcels.push(p);
         }
       } }], ['go','street'], ['leave']);
+  }
+
+  // ---- ตัดจำนวนให้เท่าเป้าหมาย (สุ่มตัดเท่า ๆ กันทุกกลุ่ม ยกเว้นผู้มารับสินค้าที่ผูกกับสินค้าแต่ละชิ้น) ----
+  const cand = S.agents.filter(a => a.type !== 'pick');
+  let extra = S.agents.length - TARGET;
+  for(let i = cand.length - 1; i > 0; i--){ const j = Math.floor(R() * (i + 1)); [cand[i], cand[j]] = [cand[j], cand[i]]; }
+  const drop = new Set(cand.slice(0, Math.max(0, Math.min(extra, cand.length))));
+  if(drop.size){
+    S.agents = S.agents.filter(a => !drop.has(a));
+    for(const tr of trains){ tr.boardList = tr.boardList.filter(a => !drop.has(a)); tr.alightList = tr.alightList.filter(a => !drop.has(a)); }
   }
 
   // ---- จำลองคิวแบบเรียงตามเวลา ----
@@ -1234,7 +1248,7 @@ function loadDate(d, t){
   T = clamp(t, OPEN, CLOSE); snapAll = true; sel = null;
   $('#dD').value = d.getDate(); $('#dM').value = d.getMonth(); $('#dY').value = d.getFullYear();
   const pax = sim.agents.filter(a => a.type === 'dep' || a.type === 'arr').length;
-  $('#ftxt').textContent = `ผู้โดยสาร ${fmtN(pax)} ราย · ผู้ใช้บริการอื่น ${fmtN(sim.agents.length - pax)} ราย · สินค้า ${fmtN(sim.parcels.length)} ชิ้น · ข้อมูลจำลอง`;
+  $('#ftxt').textContent = `ผู้มาใช้บริการ ${fmtN(sim.agents.length)} คน (ผู้โดยสาร ${fmtN(pax)} · อื่น ๆ ${fmtN(sim.agents.length - pax)}) · สินค้า ${fmtN(sim.parcels.length)} ชิ้น · ข้อมูลจำลอง`;
   frame = computeFrame(T); drawSpark(); renderPanels(); renderClock();
 }
 function today(){ const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
