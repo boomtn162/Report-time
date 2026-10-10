@@ -251,6 +251,9 @@
     color:#5a4d3f;
     margin-bottom:6px;
   }
+  .check-row-label{
+    color:var(--ink);
+  }
   select, input[type=text], input[type=time]{
     width:100%;
     padding:11px 12px;
@@ -575,6 +578,9 @@
   html[data-theme="dark"] label{
     color:#c9beac;
   }
+  html[data-theme="dark"] .check-row-label{
+    color:#c9beac;
+  }
   html[data-theme="dark"] select,
   html[data-theme="dark"] input[type=text],
   html[data-theme="dark"] input[type=time]{
@@ -786,7 +792,7 @@
     <h2><span class="num">4</span>ขบวนรถหลีก</h2>
     <label class="check-row" for="meetToggle" style="display:flex;align-items:center;gap:10px;margin-bottom:0;cursor:pointer;">
       <input type="checkbox" id="meetToggle" style="width:20px;height:20px;margin:0;">
-      <span style="font-size:14px;font-weight:600;color:var(--ink);">มีขบวนรถหลีก (สวนทาง/รอสับหลีก) ที่สถานีนี้</span>
+      <span class="check-row-label" style="font-size:14px;font-weight:600;">มีขบวนรถหลีก (สวนทาง/รอสับหลีก) ที่สถานีนี้</span>
     </label>
   </div>
 
