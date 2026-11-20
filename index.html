@@ -2493,7 +2493,7 @@ function formatDelay(schedStr, actualStr){
   if(diff < -720) diff += 1440;
   if(diff > 0) return {show:true, text:'ช้ากว่ากำหนด '+diff+' นาที', tag:diff+' นาที', cls:'late'};
   if(diff < 0) return {show:true, text:'เร็วกว่ากำหนด '+(-diff)+' นาที', tag:'-'+(-diff)+' นาที', cls:'early'};
-  return {show:true, text:'ตรงเวลา', tag:'0 นาที', cls:'ontime'};
+  return {show:true, text:'ตามเวลา', tag:'0 นาที', cls:'ontime'};
 }
 
 function calcAll(){
@@ -2608,7 +2608,7 @@ function buildSummary(arrRes, depRes, meetArrRes, meetDepRes){
     if(!res.show) return '';
     if(res.cls==='late') return 'ช้า ' + res.tag;
     if(res.cls==='early') return 'เร็ว ' + res.tag.replace('-','');
-    if(res.cls==='ontime') return 'ตรงเวลา';
+    if(res.cls==='ontime') return 'ตามเวลา';
     return '';
   }
   function delayMinutesOf(res){
@@ -2651,7 +2651,7 @@ function buildSummary(arrRes, depRes, meetArrRes, meetDepRes){
     if(delayRes){
       if(delayRes.cls==='late') statusLabel = 'ช้า ' + parseInt(delayRes.tag,10);
       else if(delayRes.cls==='early') statusLabel = 'เร็ว ' + parseInt(String(delayRes.tag).replace('-',''),10);
-      else if(delayRes.cls==='ontime') statusLabel = 'ตรงเวลา';
+      else if(delayRes.cls==='ontime') statusLabel = 'ตามเวลา';
     }
 
     let out = labelPrefix + ' ' + trainNo;
@@ -2816,7 +2816,7 @@ let allReportsCache = [];
 function parseDelayMinutes_(text){
   if(!text) return null;
   const t = String(text);
-  if(t.indexOf('ตรงเวลา') === 0) return 0;
+  if(t.indexOf('ตามเวลา') === 0 || t.indexOf('ตรงเวลา') === 0) return 0; // 'ตรงเวลา' = ข้อความเก่าที่เคยบันทึกไว้ก่อนเปลี่ยนคำ
   let m = t.match(/^ช้า\s*(\d+)/);
   if(m) return parseInt(m[1], 10);
   m = t.match(/^เร็ว\s*(\d+)/);
@@ -3344,7 +3344,7 @@ const APPS_SCRIPT_SOURCE =   "var SHEET_NAME = 'รายงาน';\n" +
   "  var v = String(cell.getValue() || '');\n" +
   "  var color = '#2b2320';\n" +
   "  if (v.indexOf('ช้า') === 0) color = '#b3261e';\n" +
-  "  else if (v.indexOf('ตรงเวลา') === 0) color = '#2e7d32';\n" +
+  "  else if (v.indexOf('ตามเวลา') === 0 || v.indexOf('ตรงเวลา') === 0) color = '#2e7d32';\n" +
   "  else if (v.indexOf('เร็ว') === 0) color = '#1565c0';\n" +
   "  cell.setFontColor(color).setFontWeight('bold');\n" +
   "}\n" +
